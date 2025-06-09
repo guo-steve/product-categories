@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronRight, ChevronDown, Plus, Minus, MoreHorizontal, Link, Edit, FolderPlus, Trash2 } from 'lucide-react';
+import { ChevronDown, Plus, Minus, Link, Edit } from 'lucide-react';
 import { Category } from '../types';
 
 interface CategoryTreeProps {
@@ -40,9 +40,7 @@ const DropdownMenu: React.FC<DropdownMenuProps> = ({ isOpen, onClose, categoryNa
 
   const menuItems = [
     { icon: Link, label: 'Associate Attribute', action: () => console.log('Associate Attribute', categoryName) },
-    { icon: Edit, label: 'Rename', action: () => console.log('Rename', categoryName) },
-    { icon: FolderPlus, label: 'Add Child', action: () => console.log('Add Child', categoryName) },
-    { icon: Trash2, label: 'Delete', action: () => console.log('Delete', categoryName), danger: true }
+    { icon: Edit, label: 'Rename', action: () => console.log('Rename', categoryName) }
   ];
 
   return (
@@ -58,11 +56,7 @@ const DropdownMenu: React.FC<DropdownMenuProps> = ({ isOpen, onClose, categoryNa
               item.action();
               onClose();
             }}
-            className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition-colors ${
-              item.danger
-                ? 'text-red-600 hover:bg-red-50'
-                : 'text-gray-700 hover:bg-gray-50'
-            }`}
+            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 transition-colors"
           >
             <item.icon className="w-4 h-4" />
             {item.label}
@@ -73,7 +67,7 @@ const DropdownMenu: React.FC<DropdownMenuProps> = ({ isOpen, onClose, categoryNa
   );
 };
 
-const CategoryItem: React.FC<CategoryItemProps> = ({ category, level = 0 }) => {
+export const CategoryItem: React.FC<CategoryItemProps> = ({ category, level = 0 }) => {
   const [isExpanded, setIsExpanded] = useState(category.isExpanded || false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const hasChildren = category.children.length > 0;
@@ -113,15 +107,15 @@ const CategoryItem: React.FC<CategoryItemProps> = ({ category, level = 0 }) => {
             </span>
           </div>
         </div>
-        
+
         <div className="col-span-3 flex items-center text-gray-600">
-          {category.attributeCount > 0 ? category.attributeCount : '—'}
+          {category.attributeCount > 0 ? category.attributeCount : '-'}
         </div>
-        
+
         <div className="col-span-2 flex items-center text-gray-900 font-medium">
-          {category.productCount > 0 ? category.productCount : '—'}
+          {category.productCount > 0 ? category.productCount : '-'}
         </div>
-        
+
         <div className="col-span-3 flex items-center justify-end">
           <div className="relative">
             <button
@@ -152,8 +146,6 @@ const CategoryItem: React.FC<CategoryItemProps> = ({ category, level = 0 }) => {
 };
 
 export const CategoryTree: React.FC<CategoryTreeProps> = ({ categories }) => {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['4'])); // Food & Grocery expanded by default
 
   // Update categories with expansion state and handle expansion toggle
@@ -175,19 +167,8 @@ export const CategoryTree: React.FC<CategoryTreeProps> = ({ categories }) => {
     return total + countChildren(category);
   }, 0);
 
-  // Simple pagination - just slice the top-level categories
-  const totalPages = Math.ceil(categoriesWithExpansion.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedCategories = categoriesWithExpansion.slice(startIndex, startIndex + itemsPerPage);
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  const handleItemsPerPageChange = (newItemsPerPage: number) => {
-    setItemsPerPage(newItemsPerPage);
-    setCurrentPage(1); // Reset to first page when changing items per page
-  };
+  // Render all categories directly without pagination
+  const paginatedCategories = categoriesWithExpansion;
 
   // Handle expansion state changes
   const handleToggleExpansion = (categoryId: string) => {
@@ -243,15 +224,15 @@ export const CategoryTree: React.FC<CategoryTreeProps> = ({ categories }) => {
               </span>
             </div>
           </div>
-          
+
           <div className="col-span-3 flex items-center text-gray-600">
             {category.attributeCount > 0 ? category.attributeCount : '—'}
           </div>
-          
+
           <div className="col-span-2 flex items-center text-gray-900 font-medium">
             {category.productCount > 0 ? category.productCount : '—'}
           </div>
-          
+
           <div className="col-span-3 flex items-center justify-end">
             <div className="relative">
               <button
@@ -301,75 +282,6 @@ export const CategoryTree: React.FC<CategoryTreeProps> = ({ categories }) => {
         {paginatedCategories.map((category) => (
           <EnhancedCategoryItem key={category.id} category={category} level={0} />
         ))}
-      </div>
-
-      {/* Pagination Footer */}
-      <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-        <div className="text-sm text-gray-700">
-          Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, categoriesWithExpansion.length)} of {categoriesWithExpansion.length} top-level categories
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Previous Page Button */}
-          {currentPage > 1 && (
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              className="px-3 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-            >
-              ←
-            </button>
-          )}
-
-          {/* Page Numbers */}
-          {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-            let pageNumber;
-            if (totalPages <= 5) {
-              pageNumber = i + 1;
-            } else if (currentPage <= 3) {
-              pageNumber = i + 1;
-            } else if (currentPage >= totalPages - 2) {
-              pageNumber = totalPages - 4 + i;
-            } else {
-              pageNumber = currentPage - 2 + i;
-            }
-
-            return (
-              <button
-                key={pageNumber}
-                onClick={() => handlePageChange(pageNumber)}
-                className={`px-3 py-1 rounded transition-colors ${
-                  pageNumber === currentPage
-                    ? 'bg-indigo-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                {pageNumber}
-              </button>
-            );
-          })}
-
-          {/* Next Page Button */}
-          {currentPage < totalPages && (
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              className="px-3 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-            >
-              →
-            </button>
-          )}
-
-          {/* Items Per Page Selector */}
-          <select
-            value={itemsPerPage}
-            onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
-            className="ml-4 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-          >
-            <option value={5}>5 / page</option>
-            <option value={10}>10 / page</option>
-            <option value={15}>15 / page</option>
-            <option value={25}>25 / page</option>
-            <option value={50}>50 / page</option>
-          </select>
-        </div>
       </div>
     </div>
   );

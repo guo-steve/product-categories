@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Filter, ChevronDown, MoreHorizontal, X, ChevronUp } from 'lucide-react';
-import { Attribute } from '../types';
-import { mockCategories, getAncestorIds, isAttributeApplicableToCategory } from '../data/mockData';
+import { Search, Filter, ChevronDown, X, ChevronUp } from 'lucide-react';
+import { Any, Attribute, Category } from '../types';
 
 interface AttributesListProps {
   attributes: Attribute[];
@@ -26,10 +25,14 @@ interface SortConfig {
   direction: 'asc' | 'desc';
 }
 
+interface FlattenedCategory {
+  id: string; name: string; fullPath: string; isLeaf: boolean
+}
+
 // Helper function to flatten categories for selection
-const flattenCategories = (categories: any[], prefix = ''): { id: string; name: string; fullPath: string; isLeaf: boolean }[] => {
+const flattenCategories = (categories: Category[], prefix = ''): FlattenedCategory[] => {
   const result: { id: string; name: string; fullPath: string; isLeaf: boolean }[] = [];
-  
+
   categories.forEach(category => {
     const fullPath = prefix ? `${prefix} > ${category.name}` : category.name;
     result.push({
@@ -38,39 +41,65 @@ const flattenCategories = (categories: any[], prefix = ''): { id: string; name: 
       fullPath,
       isLeaf: category.isLeaf || category.children.length === 0
     });
-    
+
     if (category.children && category.children.length > 0) {
       result.push(...flattenCategories(category.children, fullPath));
     }
   });
-  
+
   return result;
 };
 
 // Helper function to get category display name
-const getCategoryDisplayName = (attribute: Attribute, flatCategories: any[]): string => {
+const getCategoryDisplayName = (attribute: Attribute, flatCategories: FlattenedCategory[]): string => {
   if (attribute.isGlobal || !attribute.categoryIds) {
     return 'Global';
   }
-  
+
   const categoryNames = attribute.categoryIds.map(catId => {
     const category = flatCategories.find(c => c.id === catId);
     return category ? category.name : catId;
   });
-  
+
   return categoryNames.join(', ');
 };
 
-export const AttributesList: React.FC<AttributesListProps> = ({ 
-  attributes, 
-  title, 
-  totalCount 
+// Helper function to truncate text with tooltip
+export const TruncatedText: React.FC<{ text: string; maxLength: number; className?: string }> = ({
+  text,
+  maxLength,
+  className = ''
+}) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const truncated = text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
+  const needsTruncation = text.length > maxLength;
+
+  return (
+    <div
+      className={`relative ${className}`}
+      onMouseEnter={() => needsTruncation && setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      <span className={needsTruncation ? 'cursor-help' : ''}>{truncated}</span>
+      {showTooltip && needsTruncation && (
+        <div className="absolute z-10 px-2 py-1 text-sm bg-gray-900 text-white rounded shadow-lg -top-8 left-0 whitespace-nowrap">
+          {text}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const AttributesList: React.FC<AttributesListProps> = ({
+  attributes,
+  title,
+  totalCount
 }) => {
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'name', direction: 'asc' });
-  
+
   const [filters, setFilters] = useState<FilterState>({
     categories: [],
     linkTypes: {
@@ -90,9 +119,9 @@ export const AttributesList: React.FC<AttributesListProps> = ({
     if (!filters.categorySearch.trim()) {
       return flatCategories;
     }
-    
+
     const searchTerm = filters.categorySearch.toLowerCase();
-    return flatCategories.filter(category => 
+    return flatCategories.filter(category =>
       category.name.toLowerCase().includes(searchTerm) ||
       category.fullPath.toLowerCase().includes(searchTerm)
     );
@@ -116,7 +145,7 @@ export const AttributesList: React.FC<AttributesListProps> = ({
     if (filters.categories.length > 0) {
       filtered = filtered.filter(attr => {
         // For each selected category, check if attribute is applicable
-        const applicabilityResults = filters.categories.map(categoryId => 
+        const applicabilityResults = filters.categories.map(categoryId =>
           isAttributeApplicableToCategory(attr, categoryId, mockCategories)
         );
 
@@ -126,7 +155,7 @@ export const AttributesList: React.FC<AttributesListProps> = ({
         } else {
           // Show attributes applicable to AT LEAST ONE of the selected categories
           const applicableResults = applicabilityResults.filter(result => result.applicable);
-          
+
           if (applicableResults.length === 0) {
             return false; // Not applicable to any selected category
           }
@@ -160,8 +189,8 @@ export const AttributesList: React.FC<AttributesListProps> = ({
 
     // Sorting
     filtered.sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
+      let aValue: Any;
+      let bValue: Any;
 
       switch (sortConfig.field) {
         case 'category':
@@ -194,7 +223,7 @@ export const AttributesList: React.FC<AttributesListProps> = ({
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedAttributes = filteredAndSortedAttributes.slice(startIndex, startIndex + itemsPerPage);
 
-  const handleFilterChange = (key: keyof FilterState, value: any) => {
+  const handleFilterChange = (key: keyof FilterState, value: Any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
     setCurrentPage(1); // Reset to first page when filters change
   };
@@ -246,13 +275,13 @@ export const AttributesList: React.FC<AttributesListProps> = ({
 
   const getSortIcon = (field: SortConfig['field']) => {
     if (sortConfig.field !== field) return null;
-    return sortConfig.direction === 'asc' ? 
-      <ChevronUp className="w-4 h-4 inline ml-1" /> : 
+    return sortConfig.direction === 'asc' ?
+      <ChevronUp className="w-4 h-4 inline ml-1" /> :
       <ChevronDown className="w-4 h-4 inline ml-1" />;
   };
 
-  const activeFiltersCount = filters.categories.length + 
-    (filters.keyword ? 1 : 0) + 
+  const activeFiltersCount = filters.categories.length +
+    (filters.keyword ? 1 : 0) +
     (filters.showNotApplicable ? 1 : 0) +
     (Object.values(filters.linkTypes).filter(v => !v).length > 0 ? 1 : 0);
 
@@ -261,7 +290,7 @@ export const AttributesList: React.FC<AttributesListProps> = ({
     if (attribute.isGlobal || !attribute.categoryIds) {
       return 'global';
     }
-    
+
     if (selectedCategories.length === 0) {
       return 'direct'; // Default when no category context
     }
@@ -308,11 +337,10 @@ export const AttributesList: React.FC<AttributesListProps> = ({
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-2 border rounded-md transition-colors ${
-              showFilters || activeFiltersCount > 0
-                ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
-                : 'text-gray-700 border-gray-300 hover:bg-gray-50'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-md transition-colors ${showFilters || activeFiltersCount > 0
+              ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+              : 'text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
           >
             <Filter className="w-4 h-4" />
             {showFilters ? 'Hide Filters' : 'Show Filters'}
@@ -341,7 +369,7 @@ export const AttributesList: React.FC<AttributesListProps> = ({
               <label className="block text-sm font-medium text-gray-900 mb-3">
                 Filter by Category Nodes
               </label>
-              
+
               {/* Category Search Field */}
               <div className="relative mb-3">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -434,19 +462,18 @@ export const AttributesList: React.FC<AttributesListProps> = ({
                     <button
                       key={type}
                       onClick={() => handleLinkTypeChange(type as keyof FilterState['linkTypes'])}
-                      className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                        isSelected
-                          ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
-                          : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
-                      }`}
+                      className={`px-3 py-1 rounded text-sm font-medium transition-colors ${isSelected
+                        ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
+                        : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
+                        }`}
                     >
                       {type.charAt(0).toUpperCase() + type.slice(1)}
                     </button>
                   ))}
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  Direct: linked directly to selected categories | 
-                  Inherited: linked to ancestor categories | 
+                  Direct: linked directly to selected categories |
+                  Inherited: linked to ancestor categories |
                   Global: applies to all categories
                 </p>
               </div>
@@ -475,105 +502,110 @@ export const AttributesList: React.FC<AttributesListProps> = ({
         </div>
       )}
 
+      {/* Wider table with smaller font option */}
       <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                <input type="checkbox" className="rounded border-gray-300" />
-              </th>
-              <th 
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('name')}
-              >
-                Attribute Name {getSortIcon('name')}
-              </th>
-              <th 
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('category')}
-              >
-                Product Category {getSortIcon('category')}
-              </th>
-              <th 
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('productsInUse')}
-              >
-                Products in use {getSortIcon('productsInUse')}
-              </th>
-              <th 
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('type')}
-              >
-                Type {getSortIcon('type')}
-              </th>
-              <th 
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('createdOn')}
-              >
-                Created On {getSortIcon('createdOn')}
-              </th>
-              <th 
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('updatedOn')}
-              >
-                Updated On {getSortIcon('updatedOn')}
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {paginatedAttributes.map((attribute) => {
-              const linkType = getAttributeLinkType(attribute, filters.categories);
-              return (
-                <tr key={attribute.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <input type="checkbox" className="rounded border-gray-300" />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <span className="text-indigo-600 font-medium">{attribute.name}</span>
-                      {linkType === 'inherited' && (
-                        <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
-                          Inherited
-                        </span>
-                      )}
-                      {linkType === 'global' && (
-                        <span className="px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded">
-                          Global
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-700">
-                    {getCategoryDisplayName(attribute, flatCategories)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-indigo-600 font-medium">{attribute.productsInUse}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-700">
-                    {attribute.type}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-600 text-sm">
-                    {attribute.createdOn}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-600 text-sm">
-                    {attribute.updatedOn}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <button className="text-indigo-600 hover:text-indigo-800 font-medium">
-                        More
-                      </button>
-                      <ChevronDown className="w-4 h-4 text-gray-400" />
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="min-w-[1200px]"> {/* Force minimum width for wider table */}
+          <table className="w-full text-sm"> {/* Smaller font size */}
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <input type="checkbox" className="rounded border-gray-300" />
+                </th>
+                <th
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('name')}
+                >
+                  Attribute Name {getSortIcon('name')}
+                </th>
+                <th
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('category')}
+                >
+                  Product Category {getSortIcon('category')}
+                </th>
+                <th
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('productsInUse')}
+                >
+                  Products in use {getSortIcon('productsInUse')}
+                </th>
+                <th
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('type')}
+                >
+                  Type {getSortIcon('type')}
+                </th>
+                <th
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('createdOn')}
+                >
+                  Created On {getSortIcon('createdOn')}
+                </th>
+                <th
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('updatedOn')}
+                >
+                  Updated On {getSortIcon('updatedOn')}
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {paginatedAttributes.map((attribute) => {
+                const linkType = getAttributeLinkType(attribute, filters.categories);
+                const categoryDisplay = getCategoryDisplayName(attribute, flatCategories);
+
+                return (
+                  <tr key={attribute.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <input type="checkbox" className="rounded border-gray-300" />
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <span className="text-indigo-600 font-medium">{attribute.name}</span>
+                        {linkType === 'inherited' && (
+                          <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
+                            Inherited
+                          </span>
+                        )}
+                        {linkType === 'global' && (
+                          <span className="px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded">
+                            Global
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-gray-700">
+                      {categoryDisplay}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-indigo-600 font-medium">{attribute.productsInUse}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-gray-700">
+                      {attribute.type}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-gray-600">
+                      {attribute.createdOn}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-gray-600">
+                      {attribute.updatedOn}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <button className="text-indigo-600 hover:text-indigo-800 font-medium">
+                          More
+                        </button>
+                        <ChevronDown className="w-4 h-4 text-gray-400" />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
@@ -611,11 +643,10 @@ export const AttributesList: React.FC<AttributesListProps> = ({
               <button
                 key={pageNumber}
                 onClick={() => setCurrentPage(pageNumber)}
-                className={`px-3 py-1 rounded transition-colors ${
-                  pageNumber === currentPage
-                    ? 'bg-indigo-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
+                className={`px-3 py-1 rounded transition-colors ${pageNumber === currentPage
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+                  }`}
               >
                 {pageNumber}
               </button>

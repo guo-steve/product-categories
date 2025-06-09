@@ -30,10 +30,10 @@ export class PgAttributeRepository implements AttributeRepository {
       id: row.id,
       name: row.name,
       type: row.type,
-      categories: row.categories || [],
+      categories: row.categories ?? [],
       productsInUse: parseInt(row.products_in_use, 10),
-      createdOn: row.createdOn,
-      updatedOn: row.updatedOn,
+      createdOn: new Date(row.created_on),
+      updatedOn: new Date(row.updated_on),
     })) as Attribute[]
   }
 }

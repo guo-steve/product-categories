@@ -8,10 +8,10 @@ interface CategoryAttributesProps {
   onBack: () => void;
 }
 
-export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({ 
-  attributes, 
-  categoryName, 
-  onBack 
+export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({
+  attributes,
+  categoryName,
+  onBack
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -23,11 +23,11 @@ export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({
 
   const filteredAttributes = attributes.filter(attr => {
     const matchesSearch = attr.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = 
+    const matchesFilter =
       (filter.direct && !attr.isInherited && !attr.isGlobal) ||
       (filter.inherited && attr.isInherited) ||
       (filter.global && attr.isGlobal);
-    
+
     return matchesSearch && matchesFilter;
   });
 
@@ -106,11 +106,10 @@ export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({
                     <button
                       key={key}
                       onClick={() => handleFilterChange(key as keyof AttributeFilter)}
-                      className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                        value
+                      className={`px-3 py-1 rounded text-sm font-medium transition-colors ${value
                           ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
                           : 'bg-gray-100 text-gray-600 border border-gray-300'
-                      }`}
+                        }`}
                     >
                       {key.charAt(0).toUpperCase() + key.slice(1)}
                       {value && ' ×'}

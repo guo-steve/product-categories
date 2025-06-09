@@ -15,8 +15,8 @@ CREATE TABLE attribute (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR NOT NULL UNIQUE,
     type VARCHAR NOT NULL,
-    created_on TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_on TIMESTAMP NOT NULL DEFAULT NOW()
+    created_on TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_on TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Junction table linking attributes to categories (direct links only)
@@ -38,8 +38,8 @@ CREATE TABLE product_attribute_value (
     product_id BIGINT NOT NULL REFERENCES product(id) ON DELETE CASCADE,
     attribute_id BIGINT NOT NULL REFERENCES attribute(id) ON DELETE CASCADE,
     value JSONB NOT NULL,
-    created_on TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_on TIMESTAMP NOT NULL DEFAULT NOW(),
+    created_on TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_on TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (product_id, attribute_id)
 );
     `,

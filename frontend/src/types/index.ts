@@ -1,3 +1,6 @@
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Any = any
+
 export interface Product {
   id: string;
   name: string;
@@ -5,7 +8,7 @@ export interface Product {
   images: ProductImage[];
   color: string;
   flavour: string[];
-  attributes: Record<string, any>;
+  attributes: Record<string, Any>;
 }
 
 export interface ProductImage {
