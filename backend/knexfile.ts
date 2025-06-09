@@ -12,7 +12,7 @@ dotenvConfig({
 const config: { [key: string]: Knex.Config } = {
   [env]: {
     client: 'postgresql',
-    connection: {
+    connection: process.env.DATABASE_URL || {
       database: process.env.DB_NAME!,
       user: process.env.DB_USER!,
       password: process.env.DB_PASSWORD!,

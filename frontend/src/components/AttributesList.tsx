@@ -1,37 +1,16 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Filter, ChevronDown, X, ChevronUp } from 'lucide-react';
-import { Any, Attribute, Category } from '../types';
+import { Search, Filter, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Attribute, Category, FlatCategory, SortConfig, FilterState } from '../types';
+import { useAttributes } from '../hooks/useAttributes';
+import { useCategories } from '../hooks/useCategories';
 
 interface AttributesListProps {
-  attributes: Attribute[];
   title: string;
-  totalCount: number;
-}
-
-interface FilterState {
-  categories: string[];
-  linkTypes: {
-    direct: boolean;
-    inherited: boolean;
-    global: boolean;
-  };
-  showNotApplicable: boolean;
-  keyword: string;
-  categorySearch: string; // New field for category search
-}
-
-interface SortConfig {
-  field: 'name' | 'type' | 'category' | 'productsInUse' | 'createdOn' | 'updatedOn';
-  direction: 'asc' | 'desc';
-}
-
-interface FlattenedCategory {
-  id: string; name: string; fullPath: string; isLeaf: boolean
 }
 
 // Helper function to flatten categories for selection
-const flattenCategories = (categories: Category[], prefix = ''): FlattenedCategory[] => {
-  const result: { id: string; name: string; fullPath: string; isLeaf: boolean }[] = [];
+const flattenCategories = (categories: Category[], prefix = ''): FlatCategory[] => {
+  const result: FlatCategory[] = [];
 
   categories.forEach(category => {
     const fullPath = prefix ? `${prefix} > ${category.name}` : category.name;
@@ -50,51 +29,17 @@ const flattenCategories = (categories: Category[], prefix = ''): FlattenedCatego
   return result;
 };
 
-// Helper function to get category display name
-const getCategoryDisplayName = (attribute: Attribute, flatCategories: FlattenedCategory[]): string => {
-  if (attribute.isGlobal || !attribute.categoryIds) {
-    return 'Global';
+// Helper function to get category display name using the categories field
+const getCategoryDisplayName = (attribute: Attribute): string => {
+  if (!attribute.categories || attribute.categories.length === 0) {
+    return '';
   }
 
-  const categoryNames = attribute.categoryIds.map(catId => {
-    const category = flatCategories.find(c => c.id === catId);
-    return category ? category.name : catId;
-  });
-
-  return categoryNames.join(', ');
+  // Use the categories field directly (array of category names)
+  return attribute.categories.join(', ');
 };
 
-// Helper function to truncate text with tooltip
-export const TruncatedText: React.FC<{ text: string; maxLength: number; className?: string }> = ({
-  text,
-  maxLength,
-  className = ''
-}) => {
-  const [showTooltip, setShowTooltip] = useState(false);
-  const truncated = text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
-  const needsTruncation = text.length > maxLength;
-
-  return (
-    <div
-      className={`relative ${className}`}
-      onMouseEnter={() => needsTruncation && setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
-    >
-      <span className={needsTruncation ? 'cursor-help' : ''}>{truncated}</span>
-      {showTooltip && needsTruncation && (
-        <div className="absolute z-10 px-2 py-1 text-sm bg-gray-900 text-white rounded shadow-lg -top-8 left-0 whitespace-nowrap">
-          {text}
-        </div>
-      )}
-    </div>
-  );
-};
-
-export const AttributesList: React.FC<AttributesListProps> = ({
-  attributes,
-  title,
-  totalCount
-}) => {
+export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
@@ -109,10 +54,14 @@ export const AttributesList: React.FC<AttributesListProps> = ({
     },
     showNotApplicable: false,
     keyword: '',
-    categorySearch: '' // Initialize category search
+    categorySearch: ''
   });
 
-  const flatCategories = useMemo(() => flattenCategories(mockCategories), []);
+  // Fetch attributes and categories from backend
+  const { attributes: backendAttributes, loading: attributesLoading, error: attributesError, refetch: refetchAttributes } = useAttributes();
+  const { categories: backendCategories, loading: categoriesLoading, error: categoriesError } = useCategories();
+
+  const flatCategories = useMemo(() => flattenCategories(backendCategories), [backendCategories]);
 
   // Filter categories based on search
   const filteredCategories = useMemo(() => {
@@ -129,7 +78,7 @@ export const AttributesList: React.FC<AttributesListProps> = ({
 
   // Enhanced filtering logic based on business requirements
   const filteredAndSortedAttributes = useMemo(() => {
-    let filtered = [...attributes];
+    let filtered = [...backendAttributes];
 
     // Keyword search
     if (filters.keyword.trim()) {
@@ -137,51 +86,39 @@ export const AttributesList: React.FC<AttributesListProps> = ({
       filtered = filtered.filter(attr =>
         attr.name.toLowerCase().includes(keyword) ||
         attr.type.toLowerCase().includes(keyword) ||
-        getCategoryDisplayName(attr, flatCategories).toLowerCase().includes(keyword)
+        getCategoryDisplayName(attr).toLowerCase().includes(keyword)
       );
     }
 
-    // Category-based filtering
+    // Category-based filtering using category names instead of IDs
     if (filters.categories.length > 0) {
+      // Get selected category names from IDs
+      const selectedCategoryNames = filters.categories.map(catId => {
+        const category = flatCategories.find(c => c.id === catId);
+        return category ? category.name : catId;
+      });
+
       filtered = filtered.filter(attr => {
-        // For each selected category, check if attribute is applicable
-        const applicabilityResults = filters.categories.map(categoryId =>
-          isAttributeApplicableToCategory(attr, categoryId, mockCategories)
-        );
-
         if (filters.showNotApplicable) {
-          // Show attributes NOT applicable to ANY of the selected categories
-          return applicabilityResults.every(result => !result.applicable);
+          // Show attributes NOT applicable to selected categories
+          return !attr.isGlobal && !(attr.categories || []).some((catName: string) =>
+            selectedCategoryNames.includes(catName)
+          );
         } else {
-          // Show attributes applicable to AT LEAST ONE of the selected categories
-          const applicableResults = applicabilityResults.filter(result => result.applicable);
-
-          if (applicableResults.length === 0) {
-            return false; // Not applicable to any selected category
-          }
-
-          // Apply link type filters
-          return applicableResults.some(result => {
-            switch (result.linkType) {
-              case 'direct':
-                return filters.linkTypes.direct;
-              case 'inherited':
-                return filters.linkTypes.inherited;
-              case 'global':
-                return filters.linkTypes.global;
-              default:
-                return false;
-            }
-          });
+          // Show attributes applicable to selected categories
+          if (attr.isGlobal && filters.linkTypes.global) return true;
+          if ((attr.categories || []).some((catName: string) =>
+            selectedCategoryNames.includes(catName)
+          ) && filters.linkTypes.direct) return true;
+          return false;
         }
       });
     } else {
       // When no categories selected, show all attributes based on their global nature
       filtered = filtered.filter(attr => {
-        if (attr.isGlobal || !attr.categoryIds) {
+        if (attr.isGlobal) {
           return filters.linkTypes.global;
         } else {
-          // For non-global attributes, show them as "direct" when no category context
           return filters.linkTypes.direct;
         }
       });
@@ -189,13 +126,13 @@ export const AttributesList: React.FC<AttributesListProps> = ({
 
     // Sorting
     filtered.sort((a, b) => {
-      let aValue: Any;
-      let bValue: Any;
+      let aValue: string | number | Date;
+      let bValue: string | number | Date;
 
       switch (sortConfig.field) {
         case 'category':
-          aValue = getCategoryDisplayName(a, flatCategories);
-          bValue = getCategoryDisplayName(b, flatCategories);
+          aValue = getCategoryDisplayName(a);
+          bValue = getCategoryDisplayName(b);
           break;
         case 'productsInUse':
           aValue = Number(a.productsInUse);
@@ -203,8 +140,13 @@ export const AttributesList: React.FC<AttributesListProps> = ({
           break;
         case 'createdOn':
         case 'updatedOn':
-          aValue = new Date(a[sortConfig.field].replace(/(\d{2})\/(\d{2})\/(\d{2})/, '20$3-$2-$1'));
-          bValue = new Date(b[sortConfig.field].replace(/(\d{2})\/(\d{2})\/(\d{2})/, '20$3-$2-$1'));
+          // Handle both ISO date strings and formatted date strings
+          aValue = a[sortConfig.field].includes('T') ?
+            new Date(a[sortConfig.field]) :
+            new Date(a[sortConfig.field].replace(/(\d{2})\/(\d{2})\/(\d{2})/, '20$3-$2-$1'));
+          bValue = b[sortConfig.field].includes('T') ?
+            new Date(b[sortConfig.field]) :
+            new Date(b[sortConfig.field].replace(/(\d{2})\/(\d{2})\/(\d{2})/, '20$3-$2-$1'));
           break;
         default:
           aValue = String(a[sortConfig.field] || '').toLowerCase();
@@ -217,13 +159,13 @@ export const AttributesList: React.FC<AttributesListProps> = ({
     });
 
     return filtered;
-  }, [attributes, filters, sortConfig, flatCategories]);
+  }, [backendAttributes, filters, sortConfig, flatCategories]);
 
   const totalPages = Math.ceil(filteredAndSortedAttributes.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedAttributes = filteredAndSortedAttributes.slice(startIndex, startIndex + itemsPerPage);
 
-  const handleFilterChange = (key: keyof FilterState, value: Any) => {
+  const handleFilterChange = (key: keyof FilterState, value: FilterState[keyof FilterState]) => {
     setFilters(prev => ({ ...prev, [key]: value }));
     setCurrentPage(1); // Reset to first page when filters change
   };
@@ -245,7 +187,6 @@ export const AttributesList: React.FC<AttributesListProps> = ({
       categories: prev.categories.includes(categoryId)
         ? prev.categories.filter(id => id !== categoryId)
         : [...prev.categories, categoryId],
-      // Reset showNotApplicable when categories change
       showNotApplicable: false
     }));
     setCurrentPage(1);
@@ -287,7 +228,7 @@ export const AttributesList: React.FC<AttributesListProps> = ({
 
   // Helper function to determine attribute's link type for display
   const getAttributeLinkType = (attribute: Attribute, selectedCategories: string[]) => {
-    if (attribute.isGlobal || !attribute.categoryIds) {
+    if (attribute.isGlobal || !attribute.categories || attribute.categories.length === 0) {
       return 'global';
     }
 
@@ -295,16 +236,59 @@ export const AttributesList: React.FC<AttributesListProps> = ({
       return 'direct'; // Default when no category context
     }
 
-    // Check if it's inherited for any selected category
-    for (const categoryId of selectedCategories) {
-      const result = isAttributeApplicableToCategory(attribute, categoryId, mockCategories);
-      if (result.applicable && result.linkType === 'inherited') {
-        return 'inherited';
-      }
-    }
+    // Check if attribute is linked to any selected categories
+    const selectedCategoryNames = selectedCategories.map(catId => {
+      const category = flatCategories.find(c => c.id === catId);
+      return category ? category.name : catId;
+    });
 
-    return 'direct';
+    const hasDirectLink = (attribute.categories || []).some((catName: string) =>
+      selectedCategoryNames.includes(catName)
+    );
+
+    return hasDirectLink ? 'direct' : 'inherited';
   };
+
+  // Show loading state
+  if (attributesLoading || categoriesLoading) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
+          <p className="text-gray-600 mt-1">Loading attributes...</p>
+        </div>
+        <div className="px-6 py-12 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="text-gray-500 mt-2">Loading attributes...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (attributesError || categoriesError) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
+          <p className="text-gray-600 mt-1">Error loading data</p>
+        </div>
+        <div className="px-6 py-12 text-center">
+          <div className="text-red-600 mb-4">
+            <X className="w-8 h-8 mx-auto" />
+          </div>
+          <p className="text-red-600 font-medium mb-2">Failed to load data</p>
+          <p className="text-gray-500 mb-4">{attributesError || categoriesError}</p>
+          <button
+            onClick={refetchAttributes}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">
@@ -312,7 +296,7 @@ export const AttributesList: React.FC<AttributesListProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
-            <p className="text-gray-600 mt-1">{totalCount} attribute(s)</p>
+            <p className="text-gray-600 mt-1">{backendAttributes.length} attribute(s)</p>
           </div>
           <div className="flex items-center gap-3">
             <button className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
@@ -555,7 +539,7 @@ export const AttributesList: React.FC<AttributesListProps> = ({
             <tbody className="bg-white divide-y divide-gray-200">
               {paginatedAttributes.map((attribute) => {
                 const linkType = getAttributeLinkType(attribute, filters.categories);
-                const categoryDisplay = getCategoryDisplayName(attribute, flatCategories);
+                const categoryDisplay = getCategoryDisplayName(attribute);
 
                 return (
                   <tr key={attribute.id} className="hover:bg-gray-50 transition-colors">
@@ -611,8 +595,8 @@ export const AttributesList: React.FC<AttributesListProps> = ({
       <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
         <div className="text-sm text-gray-700">
           Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredAndSortedAttributes.length)} of {filteredAndSortedAttributes.length} attribute(s)
-          {filteredAndSortedAttributes.length !== totalCount && (
-            <span className="text-gray-500"> (filtered from {totalCount} total)</span>
+          {filteredAndSortedAttributes.length !== backendAttributes.length && (
+            <span className="text-gray-500"> (filtered from {backendAttributes.length} total)</span>
           )}
         </div>
         <div className="flex items-center gap-2">

@@ -5,13 +5,15 @@ import { Attribute, AttributeFilter } from '../types';
 interface CategoryAttributesProps {
   attributes: Attribute[];
   categoryName: string;
+  categoryId: string;
   onBack: () => void;
 }
 
-export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({
-  attributes,
-  categoryName,
-  onBack
+export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({ 
+  attributes, 
+  categoryName, 
+  categoryId,
+  onBack 
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -23,11 +25,11 @@ export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({
 
   const filteredAttributes = attributes.filter(attr => {
     const matchesSearch = attr.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter =
+    const matchesFilter = 
       (filter.direct && !attr.isInherited && !attr.isGlobal) ||
       (filter.inherited && attr.isInherited) ||
       (filter.global && attr.isGlobal);
-
+    
     return matchesSearch && matchesFilter;
   });
 
@@ -54,9 +56,14 @@ export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({
             >
               <ArrowLeft className="w-5 h-5 text-gray-600" />
             </button>
-            <h2 className="text-xl font-semibold text-gray-900">
-              Applicable Attributes in {categoryName}
-            </h2>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">
+                Applicable Attributes in {categoryName}
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Category ID: {categoryId}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <button className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
@@ -106,10 +113,11 @@ export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({
                     <button
                       key={key}
                       onClick={() => handleFilterChange(key as keyof AttributeFilter)}
-                      className={`px-3 py-1 rounded text-sm font-medium transition-colors ${value
+                      className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                        value
                           ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
                           : 'bg-gray-100 text-gray-600 border border-gray-300'
-                        }`}
+                      }`}
                     >
                       {key.charAt(0).toUpperCase() + key.slice(1)}
                       {value && ' ×'}
@@ -147,6 +155,9 @@ export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({
                 Type
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Products in Use
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
@@ -171,6 +182,9 @@ export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-gray-700">
                   {attribute.type}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className="text-indigo-600 font-medium">{attribute.productsInUse}</span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <button className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors">

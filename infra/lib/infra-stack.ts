@@ -19,7 +19,9 @@ export class InfraStack extends cdk.Stack {
 
     const backend = new BackendStack(this, 'Backend')
 
-    const frontend = new FrontendStack(this, 'Frontend', { apiUrl: backend.apiUrl })
+    const frontend = new FrontendStack(this, 'Frontend', {
+      apiUrl: backend.apiUrl,
+    })
 
     frontend.addDependency(backend)
   }

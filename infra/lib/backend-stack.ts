@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib'
 import * as apigateway from 'aws-cdk-lib/aws-apigateway'
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
+import * as ssm from 'aws-cdk-lib/aws-ssm'
 import { CloudFrontToApiGateway } from '@aws-solutions-constructs/aws-cloudfront-apigateway'
 import { Construct } from 'constructs'
 import { RestApiEndpoint } from './rest-api-endpoint'
@@ -71,6 +72,12 @@ export class BackendStack extends cdk.Stack {
       },
     })
 
+    // parameters
+    const DATABASE_URL = ssm.StringParameter.valueForStringParameter(
+      this,
+      `/${STAGE}/product-categories/database_url`,
+    )
+
     new RestApiEndpoint(this, 'GetAttributesEndpoint', {
       api,
       path: '/api/v1/attributes',
@@ -83,6 +90,7 @@ export class BackendStack extends cdk.Stack {
             timeout: cdk.Duration.seconds(10),
             environment: {
               STAGE,
+              DATABASE_URL,
             },
           },
         },
@@ -101,6 +109,7 @@ export class BackendStack extends cdk.Stack {
             timeout: cdk.Duration.seconds(10),
             environment: {
               STAGE,
+              DATABASE_URL,
             },
           },
         },

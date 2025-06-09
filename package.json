@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "build": "cd frontend && pnpm build",
     "deploy": "cd infra && cdk deploy --all",
     "bootstrap": "cd infra && cdk bootstrap"
   },

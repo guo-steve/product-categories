@@ -1,14 +1,9 @@
-import middy from '@middy/core'
-import httpJsonBodyParser from '@middy/http-json-body-parser'
-import httpErrorHandler from '@middy/http-error-handler'
-import { injectLambdaContext } from '@aws-lambda-powertools/logger/middleware'
 import { APIGatewayEvent } from 'aws-lambda'
 import { z } from 'zod'
-import { logger } from '../../lib/logger'
-import httpCors from '../../lib/cors'
 import { getPgPool } from '../../lib/pg-client'
 import { AttributeRepository } from '../../lib/repository/attribute.repository'
 import { PgAttributeRepository } from '../../lib/repository/pg/attribute.pg'
+import { createHandler } from './base'
 
 export const GetAttributesSchema = z.object({
   page: z.number().optional(),
@@ -44,16 +39,4 @@ export const getAttributes = async (event: APIGatewayEvent) => {
   }
 }
 
-export const handler = middy(getAttributes)
-  .use(injectLambdaContext(logger, { logEvent: true }))
-  .use(
-    httpJsonBodyParser({
-      disableContentTypeError: true,
-    }),
-  )
-  .use(httpCors())
-  .use(
-    httpErrorHandler({
-      logger: logger.error.bind(logger),
-    }),
-  )
+export const handler = createHandler(getAttributes)

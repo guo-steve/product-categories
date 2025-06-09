@@ -1,6 +1,3 @@
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type Any = any
-
 export interface Product {
   id: string;
   name: string;
@@ -32,16 +29,17 @@ export interface Category {
   isLeaf?: boolean; // True if this is a leaf node (can have products)
 }
 
+// Updated Attribute interface to match backend response
 export interface Attribute {
   id: string;
   name: string;
   type: 'Short Text' | 'Long Text' | 'Dropdown' | 'Multi Select' | 'URL';
-  categoryIds?: string[]; // Categories this attribute is directly linked to
+  categories: string[]; // Changed from categoryIds to categories (array of category names)
   productsInUse: number;
-  createdOn: string;
-  updatedOn: string;
+  createdOn: string; // ISO date string from backend
+  updatedOn: string; // ISO date string from backend
   isInherited?: boolean; // Computed based on context
-  isGlobal?: boolean; // True if not linked to any category
+  isGlobal?: boolean; // Computed: true if categories array is empty
 }
 
 export interface AttributeFilter {
@@ -50,7 +48,7 @@ export interface AttributeFilter {
   global: boolean;
 }
 
-// API-related types for future REST endpoints
+// API-related types for backend integration
 export interface AttributeListParams {
   categoryNodes?: string[]; // Array of category IDs
   linkTypes?: ('direct' | 'inherited' | 'global')[]; // Only applicable when categoryNodes is provided
@@ -76,3 +74,43 @@ export interface ApiResponse<T> {
     totalPages: number;
   };
 }
+
+export interface AttributeApiParams {
+  search?: string;
+  categories?: string[];
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+// Flattened category for UI purposes
+export interface FlatCategory {
+  id: string;
+  name: string;
+  fullPath: string;
+  isLeaf: boolean;
+}
+
+// Sort configuration
+export interface SortConfig {
+  field: 'name' | 'type' | 'category' | 'productsInUse' | 'createdOn' | 'updatedOn';
+  direction: 'asc' | 'desc';
+}
+
+// Filter state for attributes list
+export interface FilterState {
+  categories: string[];
+  linkTypes: {
+    direct: boolean;
+    inherited: boolean;
+    global: boolean;
+  };
+  showNotApplicable: boolean;
+  keyword: string;
+  categorySearch: string;
+}
+
+// Type alias for any - with ESLint disable
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Any = any;

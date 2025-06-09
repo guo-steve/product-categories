@@ -9,21 +9,26 @@ export class FrontendStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: { apiUrl: string }) {
     super(scope, id)
 
-    const bucket = new s3.Bucket(this, 'FrontendBucket', {
+    const bucket = new s3.Bucket(this, 'TrustanaFrontendBucket', {
       websiteIndexDocument: 'index.html', // Enable static website hosting
       autoDeleteObjects: false,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ACLS_ONLY,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     })
 
-    const distribution = new cloudfront.Distribution(this, 'Distribution', {
-      defaultBehavior: {
-        origin: new origins.S3StaticWebsiteOrigin(bucket),
-        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+    const distribution = new cloudfront.Distribution(
+      this,
+      'TrustanaDistribution',
+      {
+        defaultBehavior: {
+          origin: new origins.S3StaticWebsiteOrigin(bucket),
+          viewerProtocolPolicy:
+            cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        },
+        enableLogging: true,
+        defaultRootObject: 'index.html',
       },
-      enableLogging: true,
-      defaultRootObject: 'index.html',
-    })
+    )
 
     const deployFrontend = new s3deploy.BucketDeployment(
       this,
@@ -33,7 +38,7 @@ export class FrontendStack extends cdk.Stack {
           s3deploy.Source.asset('../frontend/dist', {
             // exclude: ['*.html'],
           }),
-          s3deploy.Source.data('env.js', `window.API_URL="${props.apiUrl}";`),
+          // s3deploy.Source.data('env.js', `window.API_URL="${props.apiUrl}";`),
         ],
         destinationBucket: bucket,
         distribution,
