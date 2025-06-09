@@ -4,12 +4,20 @@ import { getPgPool } from '../../lib/pg-client'
 import { AttributeRepository } from '../../lib/repository/attribute.repository'
 import { PgAttributeRepository } from '../../lib/repository/pg/attribute.pg'
 import { createHandler } from './base'
+import { Attribute, sortableFields } from '../../lib/entity/attribute.entity'
 
 export const GetAttributesSchema = z.object({
-  page: z.number().optional(),
-  pageSize: z.number().optional(),
-  like: z.string().optional(),
-  orderBy: z.enum(['name-asc', 'name-desc']).optional(),
+  page: z.coerce.number().optional(),
+  pageSize: z.coerce.number().optional(),
+  nameLike: z.string().optional(),
+  orderBy: z
+    .enum(
+      sortableFields.map((f) => [`${f}:asc`, `${f}:desc`]).flat() as [
+        string,
+        ...string[],
+      ],
+    )
+    .optional(),
 })
 
 export const getAttributes = async (event: APIGatewayEvent) => {
@@ -27,11 +35,25 @@ export const getAttributes = async (event: APIGatewayEvent) => {
     }
   }
 
+  const orderBy = parseResult.data.orderBy?.split(':')
+
+  const filter = {
+    page: parseResult.data.page,
+    pageSize: parseResult.data.pageSize,
+    nameLike: parseResult.data.nameLike,
+    orderBy: orderBy
+      ? {
+          field: orderBy[0] as keyof Omit<Attribute, 'id'>,
+          direction: orderBy[1] as 'asc' | 'desc',
+        }
+      : orderBy,
+  }
+
   const pgPool = getPgPool()
 
   const attributeRepo: AttributeRepository = new PgAttributeRepository(pgPool)
 
-  const attributes = await attributeRepo.listAttributes()
+  const attributes = await attributeRepo.listAttributes(filter)
 
   return {
     statusCode: 200,

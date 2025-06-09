@@ -17,3 +17,12 @@ export interface Attribute {
   createdOn: Date
   updatedOn: Date
 }
+
+export const sortableFields = [
+  'name',
+  'type',
+  'categories',
+  'productsInUse',
+  'createdOn',
+  'updatedOn',
+] as const

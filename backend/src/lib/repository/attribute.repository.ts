@@ -1,14 +1,16 @@
+import { OrderBy, PagingatedResult } from '../../types'
 import { Attribute } from '../entity/attribute.entity'
 
 export type CreateAttributeParams = Pick<Attribute, 'name' | 'type'>
 
-export const OrderByOptions = {}
+export type AttributeOrderBy = OrderBy<Omit<Attribute, 'id'>>
 
 export interface ListAttributesFilter {
   page?: number
   pageSize?: number
-  like?: string
-  orderBy?: 'name-asc' | 'name-desc'
+  nameLike?: string
+  categories?: string[]
+  orderBy?: AttributeOrderBy
 }
 
 export interface AttributeRepository {
@@ -19,5 +21,7 @@ export interface AttributeRepository {
   //
   // CreateAttribute(): Promise<string>
 
-  listAttributes(): Promise<Attribute[]>
+  listAttributes(
+    filter: ListAttributesFilter,
+  ): Promise<PagingatedResult<Attribute>>
 }
