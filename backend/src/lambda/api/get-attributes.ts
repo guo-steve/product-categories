@@ -10,6 +10,13 @@ export const GetAttributesSchema = z.object({
   page: z.coerce.number().optional(),
   pageSize: z.coerce.number().optional(),
   nameLike: z.string().optional(),
+  categories: z
+    .string()
+    .optional()
+    .refine((val) => !val || val.split(',').every((v) => v.match(/^\d+$/)), {
+      message: 'Categories must be a comma-separated list category IDs',
+    })
+    .transform((val) => (val ? val.split(',') : undefined)),
   orderBy: z
     .enum(
       sortableFields.map((f) => [`${f}:asc`, `${f}:desc`]).flat() as [
@@ -41,6 +48,7 @@ export const getAttributes = async (event: APIGatewayEvent) => {
     page: parseResult.data.page,
     pageSize: parseResult.data.pageSize,
     nameLike: parseResult.data.nameLike,
+    categories: parseResult.data.categories,
     orderBy: orderBy
       ? {
           field: orderBy[0] as keyof Omit<Attribute, 'id'>,
