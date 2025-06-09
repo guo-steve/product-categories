@@ -6,21 +6,15 @@ export async function up(knex: Knex): Promise<void> {
 -- Create category table with self-referencing hierarchy
 CREATE TABLE category (
     id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
+    name VARCHAR NOT NULL,
     parent_id BIGINT REFERENCES category(id) ON DELETE CASCADE
-);
-
---- Create attribute value type
-CREATE TABLE attribute_value_type (
-    id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE
 );
 
 -- Create attribute table for global/direct/inherited attributes
 CREATE TABLE attribute (
     id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    attribute_value_type_id BIGINT NOT NULL REFERENCES attribute_value_type(id) ON DELETE CASCADE,
+    name VARCHAR NOT NULL UNIQUE,
+    type VARCHAR NOT NULL,
     created_on TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_on TIMESTAMP NOT NULL DEFAULT NOW()
 );
@@ -58,6 +52,5 @@ export async function down(knex: Knex): Promise<void> {
     .dropTableIfExists('product')
     .dropTableIfExists('attribute_link')
     .dropTableIfExists('attribute')
-    .dropTableIfExists('attribute_value_type')
     .dropTableIfExists('category')
 }

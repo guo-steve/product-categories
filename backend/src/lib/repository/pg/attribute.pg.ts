@@ -7,43 +7,33 @@ export class PgAttributeRepository implements AttributeRepository {
     // insert other initialization code if needed
   }
 
-  async ListAttributes(): Promise<Attribute[]> {
+  async listAttributes(): Promise<Attribute[]> {
     const attributesQuery = `
-      SELECT 
-        a.id, 
-        a.name, 
-        avt.name AS type,
-        COUNT(DISTINCT al.category_id) AS "productsInUse",
-        a.created_on AS "createdOn",
-        a.updated_on AS "updatedOn"
-      FROM attribute a
-      JOIN attribute_value_type avt ON a.attribute_value_type_id = avt.id
-      LEFT JOIN attribute_link al ON a.id = al.attribute_id
-      GROUP BY a.id, a.name, avt.name, a.created_on, a.updated_on
-    `;
-    const attributesResult = await this.pool.query(attributesQuery);
+      SELECT
+          a.id,
+          a."name",
+          ARRAY_AGG(DISTINCT c."name") FILTER (WHERE c."name" IS NOT NULL) AS categories,
+          COUNT(DISTINCT p.id) AS products_in_use,
+          a."type",
+          a.created_on,
+          a.updated_on
+      FROM "attribute" a
+      LEFT JOIN attribute_link al ON al.attribute_id = a.id
+      LEFT JOIN category c ON c.id = al.category_id
+      LEFT JOIN product p ON p.category_id = c.id
+      GROUP BY a.id, a."name", a."type", a.created_on, a.updated_on
+      ORDER BY a.id
+    `
+    const attributesResult = await this.pool.query(attributesQuery)
 
-    const categoriesQuery = `
-      SELECT al.attribute_id, c.id, c.name
-      FROM attribute_link al
-      JOIN category c ON al.category_id = c.id
-    `;
-    const categoriesResult = await this.pool.query(categoriesQuery);
-
-    const categoriesByAttributeId = categoriesResult.rows.reduce((acc, row) => {
-      if (!acc[row.attribute_id]) acc[row.attribute_id] = [];
-      acc[row.attribute_id].push({ id: row.id, name: row.name });
-      return acc;
-    }, {});
-
-    return attributesResult.rows.map(row => ({
+    return attributesResult.rows.map((row) => ({
       id: row.id,
       name: row.name,
       type: row.type,
-      categories: categoriesByAttributeId[row.id] || [],
-      productsInUse: parseInt(row.productsInUse, 10),
+      categories: row.categories || [],
+      productsInUse: parseInt(row.products_in_use, 10),
       createdOn: row.createdOn,
-      updatedOn: row.updatedOn
-    })) as Attribute[];
+      updatedOn: row.updatedOn,
+    })) as Attribute[]
   }
 }

@@ -7,15 +7,18 @@ import { z } from 'zod'
 import { logger } from '../../lib/logger'
 import httpCors from '../../lib/cors'
 import { getPgPool } from '../../lib/pg-client'
-import { PgCategoryRepository } from '../../lib/repository/pg/category.pg'
+import { AttributeRepository } from '../../lib/repository/attribute.repository'
+import { PgAttributeRepository } from '../../lib/repository/pg/attribute.pg'
 
-export const GetCategoryTreeSchema = z.object({
-  includeProducts: z.boolean().optional(),
-  includeAttributes: z.boolean().optional(),
+export const GetAttributesSchema = z.object({
+  page: z.number().optional(),
+  pageSize: z.number().optional(),
+  like: z.string().optional(),
+  orderBy: z.enum(['name-asc', 'name-desc']).optional(),
 })
 
-export const getCategoryTree = async (event: APIGatewayEvent) => {
-  const parseResult = GetCategoryTreeSchema.safeParse(
+export const getAttributes = async (event: APIGatewayEvent) => {
+  const parseResult = GetAttributesSchema.safeParse(
     event.queryStringParameters || {},
   )
 
@@ -31,17 +34,17 @@ export const getCategoryTree = async (event: APIGatewayEvent) => {
 
   const pgPool = getPgPool()
 
-  const categoryRepo = new PgCategoryRepository(pgPool)
+  const attributeRepo: AttributeRepository = new PgAttributeRepository(pgPool)
 
-  const categories = await categoryRepo.getCategoryTree()
+  const attributes = await attributeRepo.listAttributes()
 
   return {
     statusCode: 200,
-    body: JSON.stringify(categories),
+    body: JSON.stringify(attributes),
   }
 }
 
-export const handler = middy(getCategoryTree)
+export const handler = middy(getAttributes)
   .use(injectLambdaContext(logger, { logEvent: true }))
   .use(
     httpJsonBodyParser({

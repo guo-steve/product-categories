@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express'
 import { APIGatewayEvent, Context, Handler } from 'aws-lambda'
 import { handler as getCategoryTree } from './lambda/api/get-category-tree'
+import { handler as getAttributes } from './lambda/api/get-attributes'
 
 process.env = {
   ...process.env,
@@ -20,6 +21,7 @@ app.get('/api/health', (_req, res) => {
 
 // todo: add more routes
 app.get('/api/v1/categories/tree', wrapLambdaHandler(getCategoryTree))
+app.get('/api/v1/attributes', wrapLambdaHandler(getAttributes))
 
 app.listen(8000, () => {
   console.log('Server is running on http://localhost:8000')

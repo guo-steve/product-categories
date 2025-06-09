@@ -10,5 +10,5 @@ export interface AttributeRepository {
   //
   // CreateAttribute(): Promise<string>
 
-  ListAttributes(): Promise<Attribute[]>
+  listAttributes(): Promise<Attribute[]>
 }
