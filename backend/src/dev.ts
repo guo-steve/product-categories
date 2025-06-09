@@ -70,8 +70,6 @@ export function wrapLambdaHandler(handler: Handler) {
       // Invoke the Lambda handler
       const result = await handler(event, context, () => {})
 
-      console.log('Lambda handler result: %o', result)
-
       // Handle the Lambda response
       if (result) {
         res.status(result.statusCode || 200)

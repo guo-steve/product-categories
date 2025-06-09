@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Plus, Minus, Edit, X, Eye } from 'lucide-react';
+import { ChevronDown, Plus, Minus, X, Eye } from 'lucide-react';
 import { Category } from '../types';
 import { useCategories } from '../hooks/useCategories';
 
