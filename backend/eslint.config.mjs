@@ -6,15 +6,16 @@ import eslintConfigPrettier from 'eslint-config-prettier/flat'
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
-  { files: ['**/*.{js,mjs,cjs,ts}'] },
-  { files: ['**/*.js'], languageOptions: { sourceType: 'commonjs' } },
-  { languageOptions: { globals: globals.browser } },
-  pluginJs.configs.recommended,
-  ...tseslint.configs.recommended,
-  eslintPluginPrettierRecommended,
   {
     ignores: ['**/node_modules/**', '**/cdk.out/**', '**/dist/**'],
   },
+  { files: ['**/*.{js,mjs,cjs,ts}'] },
+  { files: ['**/*.js'], languageOptions: { sourceType: 'commonjs' } },
+  { languageOptions: { globals: { ...globals.browser, ...globals.node } } },
+  pluginJs.configs.recommended,
+  ...tseslint.configs.recommended,
+  eslintConfigPrettier,
+  eslintPluginPrettierRecommended,
   {
     rules: {
       'prettier/prettier': [
@@ -32,5 +33,4 @@ export default [
       ],
     },
   },
-  eslintConfigPrettier,
 ]

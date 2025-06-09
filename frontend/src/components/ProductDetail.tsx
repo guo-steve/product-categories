@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
-import { Edit2, Plus, Star } from 'lucide-react';
-import { Product } from '../types';
+import React, { useState } from 'react'
+import { Edit2, Plus, Star } from 'lucide-react'
+import { Product } from '../types'
 
 interface ProductDetailProps {
-  product: Product;
+  product: Product
 }
 
 export const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(false)
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-8 mb-8">
@@ -17,7 +17,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
           <button className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors">
             <Plus className="w-4 h-4" />
           </button>
-          <button 
+          <button
             onClick={() => setIsEditing(!isEditing)}
             className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
           >
@@ -86,7 +86,9 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
                 )}
                 <div className="mt-2 text-center">
                   <p className="text-xs text-gray-500">{image.size}</p>
-                  <p className="text-xs text-gray-600 font-medium">{image.filename}</p>
+                  <p className="text-xs text-gray-600 font-medium">
+                    {image.filename}
+                  </p>
                   <p className="text-xs text-gray-500">{image.fileSize}</p>
                 </div>
               </div>
@@ -127,5 +129,6 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
+

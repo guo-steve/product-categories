@@ -1,49 +1,51 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Search, Filter, Trash2 } from 'lucide-react';
-import { Attribute, AttributeFilter } from '../types';
+import React, { useState } from 'react'
+import { ArrowLeft, Search, Filter, Trash2 } from 'lucide-react'
+import { Attribute, AttributeFilter } from '../types'
 
 interface CategoryAttributesProps {
-  attributes: Attribute[];
-  categoryName: string;
-  categoryId: string;
-  onBack: () => void;
+  attributes: Attribute[]
+  categoryName: string
+  categoryId: string
+  onBack: () => void
 }
 
-export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({ 
-  attributes, 
-  categoryName, 
+export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({
+  attributes,
+  categoryName,
   categoryId,
-  onBack 
+  onBack,
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
   const [filter, setFilter] = useState<AttributeFilter>({
     direct: true,
     inherited: true,
-    global: true
-  });
+    global: true,
+  })
 
-  const filteredAttributes = attributes.filter(attr => {
-    const matchesSearch = attr.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = 
+  const filteredAttributes = attributes.filter((attr) => {
+    const matchesSearch = attr.name
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+    const matchesFilter =
       (filter.direct && !attr.isInherited && !attr.isGlobal) ||
       (filter.inherited && attr.isInherited) ||
-      (filter.global && attr.isGlobal);
-    
-    return matchesSearch && matchesFilter;
-  });
+      (filter.global && attr.isGlobal)
+
+    return matchesSearch && matchesFilter
+  })
 
   const handleFilterChange = (key: keyof AttributeFilter) => {
-    setFilter(prev => ({ ...prev, [key]: !prev[key] }));
-  };
+    setFilter((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
 
   const applyFilters = () => {
-    setShowFilters(false);
-  };
+    setShowFilters(false)
+  }
 
   const resetFilters = () => {
-    setFilter({ direct: true, inherited: true, global: true });
-  };
+    setFilter({ direct: true, inherited: true, global: true })
+  }
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">
@@ -76,7 +78,9 @@ export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({
         </div>
 
         <div className="flex items-center gap-4 mt-4">
-          <p className="text-gray-600">Total {filteredAttributes.length} attributes</p>
+          <p className="text-gray-600">
+            Total {filteredAttributes.length} attributes
+          </p>
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -112,12 +116,13 @@ export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({
                   {Object.entries(filter).map(([key, value]) => (
                     <button
                       key={key}
-                      onClick={() => handleFilterChange(key as keyof AttributeFilter)}
-                      className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                        value
+                      onClick={() =>
+                        handleFilterChange(key as keyof AttributeFilter)
+                      }
+                      className={`px-3 py-1 rounded text-sm font-medium transition-colors ${value
                           ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
                           : 'bg-gray-100 text-gray-600 border border-gray-300'
-                      }`}
+                        }`}
                     >
                       {key.charAt(0).toUpperCase() + key.slice(1)}
                       {value && ' ×'}
@@ -164,10 +169,15 @@ export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredAttributes.map((attribute) => (
-              <tr key={attribute.id} className="hover:bg-gray-50 transition-colors">
+              <tr
+                key={attribute.id}
+                className="hover:bg-gray-50 transition-colors"
+              >
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center gap-2">
-                    <span className="text-indigo-600 font-medium">{attribute.name}</span>
+                    <span className="text-indigo-600 font-medium">
+                      {attribute.name}
+                    </span>
                     {attribute.isInherited && (
                       <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
                         Inherited
@@ -184,7 +194,9 @@ export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({
                   {attribute.type}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="text-indigo-600 font-medium">{attribute.productsInUse}</span>
+                  <span className="text-indigo-600 font-medium">
+                    {attribute.productsInUse}
+                  </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <button className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors">
@@ -202,7 +214,9 @@ export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({
           Total {filteredAttributes.length} attribute(s)
         </div>
         <div className="flex items-center gap-2">
-          <button className="px-3 py-1 bg-indigo-600 text-white rounded">1</button>
+          <button className="px-3 py-1 bg-indigo-600 text-white rounded">
+            1
+          </button>
           <select className="border border-gray-300 rounded px-2 py-1 text-sm">
             <option value={25}>25 / page</option>
             <option value={50}>50 / page</option>
@@ -211,5 +225,6 @@ export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
+
