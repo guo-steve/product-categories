@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Search, Filter, ChevronDown, MoreHorizontal } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Search, Filter, ChevronDown, MoreHorizontal, X, ChevronUp } from 'lucide-react';
 import { Attribute } from '../types';
+import { mockCategories, getAncestorIds, isAttributeApplicableToCategory } from '../data/mockData';
 
 interface AttributesListProps {
   attributes: Attribute[];
@@ -8,23 +9,273 @@ interface AttributesListProps {
   totalCount: number;
 }
 
+interface FilterState {
+  categories: string[];
+  linkTypes: {
+    direct: boolean;
+    inherited: boolean;
+    global: boolean;
+  };
+  showNotApplicable: boolean;
+  keyword: string;
+  categorySearch: string; // New field for category search
+}
+
+interface SortConfig {
+  field: 'name' | 'type' | 'category' | 'productsInUse' | 'createdOn' | 'updatedOn';
+  direction: 'asc' | 'desc';
+}
+
+// Helper function to flatten categories for selection
+const flattenCategories = (categories: any[], prefix = ''): { id: string; name: string; fullPath: string; isLeaf: boolean }[] => {
+  const result: { id: string; name: string; fullPath: string; isLeaf: boolean }[] = [];
+  
+  categories.forEach(category => {
+    const fullPath = prefix ? `${prefix} > ${category.name}` : category.name;
+    result.push({
+      id: category.id,
+      name: category.name,
+      fullPath,
+      isLeaf: category.isLeaf || category.children.length === 0
+    });
+    
+    if (category.children && category.children.length > 0) {
+      result.push(...flattenCategories(category.children, fullPath));
+    }
+  });
+  
+  return result;
+};
+
+// Helper function to get category display name
+const getCategoryDisplayName = (attribute: Attribute, flatCategories: any[]): string => {
+  if (attribute.isGlobal || !attribute.categoryIds) {
+    return 'Global';
+  }
+  
+  const categoryNames = attribute.categoryIds.map(catId => {
+    const category = flatCategories.find(c => c.id === catId);
+    return category ? category.name : catId;
+  });
+  
+  return categoryNames.join(', ');
+};
+
 export const AttributesList: React.FC<AttributesListProps> = ({ 
   attributes, 
   title, 
   totalCount 
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 25;
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'name', direction: 'asc' });
+  
+  const [filters, setFilters] = useState<FilterState>({
+    categories: [],
+    linkTypes: {
+      direct: true,
+      inherited: true,
+      global: true
+    },
+    showNotApplicable: false,
+    keyword: '',
+    categorySearch: '' // Initialize category search
+  });
 
-  const filteredAttributes = attributes.filter(attr =>
-    attr.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const flatCategories = useMemo(() => flattenCategories(mockCategories), []);
 
-  const totalPages = Math.ceil(filteredAttributes.length / itemsPerPage);
+  // Filter categories based on search
+  const filteredCategories = useMemo(() => {
+    if (!filters.categorySearch.trim()) {
+      return flatCategories;
+    }
+    
+    const searchTerm = filters.categorySearch.toLowerCase();
+    return flatCategories.filter(category => 
+      category.name.toLowerCase().includes(searchTerm) ||
+      category.fullPath.toLowerCase().includes(searchTerm)
+    );
+  }, [flatCategories, filters.categorySearch]);
+
+  // Enhanced filtering logic based on business requirements
+  const filteredAndSortedAttributes = useMemo(() => {
+    let filtered = [...attributes];
+
+    // Keyword search
+    if (filters.keyword.trim()) {
+      const keyword = filters.keyword.toLowerCase();
+      filtered = filtered.filter(attr =>
+        attr.name.toLowerCase().includes(keyword) ||
+        attr.type.toLowerCase().includes(keyword) ||
+        getCategoryDisplayName(attr, flatCategories).toLowerCase().includes(keyword)
+      );
+    }
+
+    // Category-based filtering
+    if (filters.categories.length > 0) {
+      filtered = filtered.filter(attr => {
+        // For each selected category, check if attribute is applicable
+        const applicabilityResults = filters.categories.map(categoryId => 
+          isAttributeApplicableToCategory(attr, categoryId, mockCategories)
+        );
+
+        if (filters.showNotApplicable) {
+          // Show attributes NOT applicable to ANY of the selected categories
+          return applicabilityResults.every(result => !result.applicable);
+        } else {
+          // Show attributes applicable to AT LEAST ONE of the selected categories
+          const applicableResults = applicabilityResults.filter(result => result.applicable);
+          
+          if (applicableResults.length === 0) {
+            return false; // Not applicable to any selected category
+          }
+
+          // Apply link type filters
+          return applicableResults.some(result => {
+            switch (result.linkType) {
+              case 'direct':
+                return filters.linkTypes.direct;
+              case 'inherited':
+                return filters.linkTypes.inherited;
+              case 'global':
+                return filters.linkTypes.global;
+              default:
+                return false;
+            }
+          });
+        }
+      });
+    } else {
+      // When no categories selected, show all attributes based on their global nature
+      filtered = filtered.filter(attr => {
+        if (attr.isGlobal || !attr.categoryIds) {
+          return filters.linkTypes.global;
+        } else {
+          // For non-global attributes, show them as "direct" when no category context
+          return filters.linkTypes.direct;
+        }
+      });
+    }
+
+    // Sorting
+    filtered.sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortConfig.field) {
+        case 'category':
+          aValue = getCategoryDisplayName(a, flatCategories);
+          bValue = getCategoryDisplayName(b, flatCategories);
+          break;
+        case 'productsInUse':
+          aValue = Number(a.productsInUse);
+          bValue = Number(b.productsInUse);
+          break;
+        case 'createdOn':
+        case 'updatedOn':
+          aValue = new Date(a[sortConfig.field].replace(/(\d{2})\/(\d{2})\/(\d{2})/, '20$3-$2-$1'));
+          bValue = new Date(b[sortConfig.field].replace(/(\d{2})\/(\d{2})\/(\d{2})/, '20$3-$2-$1'));
+          break;
+        default:
+          aValue = String(a[sortConfig.field] || '').toLowerCase();
+          bValue = String(b[sortConfig.field] || '').toLowerCase();
+      }
+
+      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return filtered;
+  }, [attributes, filters, sortConfig, flatCategories]);
+
+  const totalPages = Math.ceil(filteredAndSortedAttributes.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedAttributes = filteredAttributes.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedAttributes = filteredAndSortedAttributes.slice(startIndex, startIndex + itemsPerPage);
+
+  const handleFilterChange = (key: keyof FilterState, value: any) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+    setCurrentPage(1); // Reset to first page when filters change
+  };
+
+  const handleLinkTypeChange = (type: keyof FilterState['linkTypes']) => {
+    setFilters(prev => ({
+      ...prev,
+      linkTypes: {
+        ...prev.linkTypes,
+        [type]: !prev.linkTypes[type]
+      }
+    }));
+    setCurrentPage(1);
+  };
+
+  const handleCategoryToggle = (categoryId: string) => {
+    setFilters(prev => ({
+      ...prev,
+      categories: prev.categories.includes(categoryId)
+        ? prev.categories.filter(id => id !== categoryId)
+        : [...prev.categories, categoryId],
+      // Reset showNotApplicable when categories change
+      showNotApplicable: false
+    }));
+    setCurrentPage(1);
+  };
+
+  const handleSort = (field: SortConfig['field']) => {
+    setSortConfig(prev => ({
+      field,
+      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const clearAllFilters = () => {
+    setFilters({
+      categories: [],
+      linkTypes: {
+        direct: true,
+        inherited: true,
+        global: true
+      },
+      showNotApplicable: false,
+      keyword: '',
+      categorySearch: ''
+    });
+    setCurrentPage(1);
+  };
+
+  const getSortIcon = (field: SortConfig['field']) => {
+    if (sortConfig.field !== field) return null;
+    return sortConfig.direction === 'asc' ? 
+      <ChevronUp className="w-4 h-4 inline ml-1" /> : 
+      <ChevronDown className="w-4 h-4 inline ml-1" />;
+  };
+
+  const activeFiltersCount = filters.categories.length + 
+    (filters.keyword ? 1 : 0) + 
+    (filters.showNotApplicable ? 1 : 0) +
+    (Object.values(filters.linkTypes).filter(v => !v).length > 0 ? 1 : 0);
+
+  // Helper function to determine attribute's link type for display
+  const getAttributeLinkType = (attribute: Attribute, selectedCategories: string[]) => {
+    if (attribute.isGlobal || !attribute.categoryIds) {
+      return 'global';
+    }
+    
+    if (selectedCategories.length === 0) {
+      return 'direct'; // Default when no category context
+    }
+
+    // Check if it's inherited for any selected category
+    for (const categoryId of selectedCategories) {
+      const result = isAttributeApplicableToCategory(attribute, categoryId, mockCategories);
+      if (result.applicable && result.linkType === 'inherited') {
+        return 'inherited';
+      }
+    }
+
+    return 'direct';
+  };
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">
@@ -49,21 +300,180 @@ export const AttributesList: React.FC<AttributesListProps> = ({
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search attributes"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search attributes by name, type, or category"
+              value={filters.keyword}
+              onChange={(e) => handleFilterChange('keyword', e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+            className={`flex items-center gap-2 px-4 py-2 border rounded-md transition-colors ${
+              showFilters || activeFiltersCount > 0
+                ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                : 'text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
           >
             <Filter className="w-4 h-4" />
             {showFilters ? 'Hide Filters' : 'Show Filters'}
+            {activeFiltersCount > 0 && (
+              <span className="bg-indigo-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                {activeFiltersCount}
+              </span>
+            )}
           </button>
+          {activeFiltersCount > 0 && (
+            <button
+              onClick={clearAllFilters}
+              className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+            >
+              Clear All
+            </button>
+          )}
         </div>
       </div>
+
+      {showFilters && (
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+          <div className="space-y-6">
+            {/* Category Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-3">
+                Filter by Category Nodes
+              </label>
+              
+              {/* Category Search Field */}
+              <div className="relative mb-3">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search categories..."
+                  value={filters.categorySearch}
+                  onChange={(e) => handleFilterChange('categorySearch', e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                />
+                {filters.categorySearch && (
+                  <button
+                    onClick={() => handleFilterChange('categorySearch', '')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Category List */}
+              <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-md bg-white">
+                {filteredCategories.length > 0 ? (
+                  filteredCategories.map((category) => (
+                    <label
+                      key={category.id}
+                      className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filters.categories.includes(category.id)}
+                        onChange={() => handleCategoryToggle(category.id)}
+                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">
+                        {category.fullPath}
+                        {category.isLeaf && <span className="text-indigo-600 ml-1">(leaf)</span>}
+                      </span>
+                    </label>
+                  ))
+                ) : (
+                  <div className="px-3 py-4 text-sm text-gray-500 text-center">
+                    No categories found matching "{filters.categorySearch}"
+                  </div>
+                )}
+              </div>
+
+              {/* Search Results Info */}
+              {filters.categorySearch && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Showing {filteredCategories.length} of {flatCategories.length} categories
+                </p>
+              )}
+
+              {/* Selected Categories */}
+              {filters.categories.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Selected Categories:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {filters.categories.map(catId => {
+                      const category = flatCategories.find(c => c.id === catId);
+                      return category ? (
+                        <span
+                          key={catId}
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-sm"
+                        >
+                          {category.name}
+                          <button
+                            onClick={() => handleCategoryToggle(catId)}
+                            className="hover:text-indigo-900"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Link Type Filter - Only show when categories are selected */}
+            {filters.categories.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-3">
+                  Filter by Link Type
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(filters.linkTypes).map(([type, isSelected]) => (
+                    <button
+                      key={type}
+                      onClick={() => handleLinkTypeChange(type as keyof FilterState['linkTypes'])}
+                      className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                        isSelected
+                          ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
+                          : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
+                      }`}
+                    >
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Direct: linked directly to selected categories | 
+                  Inherited: linked to ancestor categories | 
+                  Global: applies to all categories
+                </p>
+              </div>
+            )}
+
+            {/* Not Applicable Filter - Only show when categories are selected */}
+            {filters.categories.length > 0 && (
+              <div>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={filters.showNotApplicable}
+                    onChange={(e) => handleFilterChange('showNotApplicable', e.target.checked)}
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="ml-2 text-sm font-medium text-gray-900">
+                    Show attributes NOT applicable to selected categories
+                  </span>
+                </label>
+                <p className="text-xs text-gray-500 mt-1 ml-6">
+                  Use this to find attributes that can be linked to the selected categories
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full">
@@ -72,23 +482,41 @@ export const AttributesList: React.FC<AttributesListProps> = ({
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 <input type="checkbox" className="rounded border-gray-300" />
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Attribute Name
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSort('name')}
+              >
+                Attribute Name {getSortIcon('name')}
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Product Category
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSort('category')}
+              >
+                Product Category {getSortIcon('category')}
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Products in use
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSort('productsInUse')}
+              >
+                Products in use {getSortIcon('productsInUse')}
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Type
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSort('type')}
+              >
+                Type {getSortIcon('type')}
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Created On
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSort('createdOn')}
+              >
+                Created On {getSortIcon('createdOn')}
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Updated On
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSort('updatedOn')}
+              >
+                Updated On {getSortIcon('updatedOn')}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
@@ -96,77 +524,124 @@ export const AttributesList: React.FC<AttributesListProps> = ({
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {paginatedAttributes.map((attribute) => (
-              <tr key={attribute.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <input type="checkbox" className="rounded border-gray-300" />
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center gap-2">
-                    <span className="text-indigo-600 font-medium">{attribute.name}</span>
-                    {attribute.isInherited && (
-                      <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
-                        Inherited
-                      </span>
-                    )}
-                    {attribute.isGlobal && (
-                      <span className="px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded">
-                        Global
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-700">
-                  {attribute.category || '—'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="text-indigo-600 font-medium">{attribute.productsInUse}</span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-700">
-                  {attribute.type}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-600 text-sm">
-                  {attribute.createdOn}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-600 text-sm">
-                  {attribute.updatedOn}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center gap-2">
-                    <button className="text-indigo-600 hover:text-indigo-800 font-medium">
-                      More
-                    </button>
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {paginatedAttributes.map((attribute) => {
+              const linkType = getAttributeLinkType(attribute, filters.categories);
+              return (
+                <tr key={attribute.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <input type="checkbox" className="rounded border-gray-300" />
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      <span className="text-indigo-600 font-medium">{attribute.name}</span>
+                      {linkType === 'inherited' && (
+                        <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
+                          Inherited
+                        </span>
+                      )}
+                      {linkType === 'global' && (
+                        <span className="px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded">
+                          Global
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-700">
+                    {getCategoryDisplayName(attribute, flatCategories)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-indigo-600 font-medium">{attribute.productsInUse}</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-700">
+                    {attribute.type}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-600 text-sm">
+                    {attribute.createdOn}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-600 text-sm">
+                    {attribute.updatedOn}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      <button className="text-indigo-600 hover:text-indigo-800 font-medium">
+                        More
+                      </button>
+                      <ChevronDown className="w-4 h-4 text-gray-400" />
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
       <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
         <div className="text-sm text-gray-700">
-          Total {filteredAttributes.length} attribute(s)
+          Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredAndSortedAttributes.length)} of {filteredAndSortedAttributes.length} attribute(s)
+          {filteredAndSortedAttributes.length !== totalCount && (
+            <span className="text-gray-500"> (filtered from {totalCount} total)</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+          {/* Previous Page Button */}
+          {currentPage > 1 && (
             <button
-              key={page}
-              onClick={() => setCurrentPage(page)}
-              className={`px-3 py-1 rounded ${
-                page === currentPage
-                  ? 'bg-indigo-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
-              } transition-colors`}
+              onClick={() => setCurrentPage(currentPage - 1)}
+              className="px-3 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors"
             >
-              {page}
+              ←
             </button>
-          ))}
+          )}
+
+          {/* Page Numbers */}
+          {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+            let pageNumber;
+            if (totalPages <= 5) {
+              pageNumber = i + 1;
+            } else if (currentPage <= 3) {
+              pageNumber = i + 1;
+            } else if (currentPage >= totalPages - 2) {
+              pageNumber = totalPages - 4 + i;
+            } else {
+              pageNumber = currentPage - 2 + i;
+            }
+
+            return (
+              <button
+                key={pageNumber}
+                onClick={() => setCurrentPage(pageNumber)}
+                className={`px-3 py-1 rounded transition-colors ${
+                  pageNumber === currentPage
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {pageNumber}
+              </button>
+            );
+          })}
+
+          {/* Next Page Button */}
+          {currentPage < totalPages && (
+            <button
+              onClick={() => setCurrentPage(currentPage + 1)}
+              className="px-3 py-1 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            >
+              →
+            </button>
+          )}
+
+          {/* Items Per Page Selector */}
           <select
             value={itemsPerPage}
-            className="ml-4 border border-gray-300 rounded px-2 py-1 text-sm"
+            onChange={(e) => {
+              setItemsPerPage(Number(e.target.value));
+              setCurrentPage(1);
+            }}
+            className="ml-4 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
           >
+            <option value={10}>10 / page</option>
             <option value={25}>25 / page</option>
             <option value={50}>50 / page</option>
             <option value={100}>100 / page</option>

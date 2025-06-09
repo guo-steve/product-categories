@@ -23,25 +23,53 @@ export interface Category {
   name: string;
   parentId?: string;
   children: Category[];
-  attributeCount: number;
+  attributeCount: number; // Count of directly linked attributes
   productCount: number;
   isExpanded?: boolean;
+  isLeaf?: boolean; // True if this is a leaf node (can have products)
 }
 
 export interface Attribute {
   id: string;
   name: string;
   type: 'Short Text' | 'Long Text' | 'Dropdown' | 'Multi Select' | 'URL';
-  category?: string;
+  categoryIds?: string[]; // Categories this attribute is directly linked to
   productsInUse: number;
   createdOn: string;
   updatedOn: string;
-  isInherited?: boolean;
-  isGlobal?: boolean;
+  isInherited?: boolean; // Computed based on context
+  isGlobal?: boolean; // True if not linked to any category
 }
 
 export interface AttributeFilter {
   direct: boolean;
   inherited: boolean;
   global: boolean;
+}
+
+// API-related types for future REST endpoints
+export interface AttributeListParams {
+  categoryNodes?: string[]; // Array of category IDs
+  linkTypes?: ('direct' | 'inherited' | 'global')[]; // Only applicable when categoryNodes is provided
+  notApplicable?: boolean; // Show attributes NOT linked to categoryNodes (bonus feature)
+  keyword?: string; // Search term
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface CategoryTreeParams {
+  includeAttributeCount?: boolean; // Include count of directly linked attributes
+  includeProductCount?: boolean; // Include count of products
+}
+
+export interface ApiResponse<T> {
+  data: T;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }

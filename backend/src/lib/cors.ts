@@ -4,6 +4,6 @@ export default (options?: Options) => {
   return cors({
     ...options,
     credentials: true,
-    origins: ['http://localhost:8081'],
+    origins: ['http://localhost:5173'],
   })
 }
