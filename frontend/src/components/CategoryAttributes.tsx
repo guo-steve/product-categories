@@ -119,10 +119,11 @@ export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({
                       onClick={() =>
                         handleFilterChange(key as keyof AttributeFilter)
                       }
-                      className={`px-3 py-1 rounded text-sm font-medium transition-colors ${value
+                      className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                        value
                           ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
                           : 'bg-gray-100 text-gray-600 border border-gray-300'
-                        }`}
+                      }`}
                     >
                       {key.charAt(0).toUpperCase() + key.slice(1)}
                       {value && ' ×'}
@@ -227,4 +228,3 @@ export const CategoryAttributes: React.FC<CategoryAttributesProps> = ({
     </div>
   )
 }
-

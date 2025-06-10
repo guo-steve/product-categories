@@ -14,4 +14,3 @@ if (!config.apiBaseUrl) {
 }
 
 export default config
-

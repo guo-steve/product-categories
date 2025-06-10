@@ -8,6 +8,9 @@ export interface PagingatedResult<T> {
   pagination: {
     page: number
     pageSize: number
-    hasNextPage: boolean
+    totalCount: number
   }
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Any = any

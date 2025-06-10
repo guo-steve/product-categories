@@ -70,12 +70,36 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
   })
 
   // Fetch attributes and categories from backend
+  const filter = useMemo(
+    () => ({
+      page: currentPage,
+      pageSize: itemsPerPage,
+      nameLike: filters.keyword,
+      orderBy: `${sortConfig.field}:${sortConfig.direction}`,
+      categories: filters.categories,
+      linkTypes: filters.linkTypes,
+      showNotApplicable: filters.showNotApplicable,
+    }),
+    [
+      currentPage,
+      itemsPerPage,
+      filters.keyword,
+      filters.categories,
+      filters.linkTypes,
+      filters.showNotApplicable,
+      sortConfig.field,
+      sortConfig.direction,
+    ],
+  )
+
   const {
-    attributes: backendAttributes,
+    attributes,
+    pagination,
     loading: attributesLoading,
     error: attributesError,
     refetch: refetchAttributes,
-  } = useAttributes()
+  } = useAttributes(filter)
+
   const {
     categories: backendCategories,
     loading: categoriesLoading,
@@ -101,117 +125,13 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
     )
   }, [flatCategories, filters.categorySearch])
 
-  // Enhanced filtering logic based on business requirements
-  const filteredAndSortedAttributes = useMemo(() => {
-    let filtered = [...backendAttributes]
+  const { totalCount } = pagination
 
-    // Keyword search
-    if (filters.keyword.trim()) {
-      const keyword = filters.keyword.toLowerCase()
-      filtered = filtered.filter(
-        (attr) =>
-          attr.name.toLowerCase().includes(keyword) ||
-          attr.type.toLowerCase().includes(keyword) ||
-          getCategoryDisplayName(attr).toLowerCase().includes(keyword),
-      )
-    }
-
-    // Category-based filtering using category names instead of IDs
-    if (filters.categories.length > 0) {
-      // Get selected category names from IDs
-      const selectedCategoryNames = filters.categories.map((catId) => {
-        const category = flatCategories.find((c) => c.id === catId)
-        return category ? category.name : catId
-      })
-
-      filtered = filtered.filter((attr) => {
-        if (filters.showNotApplicable) {
-          // Show attributes NOT applicable to selected categories
-          return (
-            !attr.isGlobal &&
-            !(attr.categories || []).some((catName: string) =>
-              selectedCategoryNames.includes(catName),
-            )
-          )
-        } else {
-          // Show attributes applicable to selected categories
-          if (attr.isGlobal && filters.linkTypes.global) return true
-          if (
-            (attr.categories || []).some((catName: string) =>
-              selectedCategoryNames.includes(catName),
-            ) &&
-            filters.linkTypes.direct
-          )
-            return true
-          return false
-        }
-      })
-    } else {
-      // When no categories selected, show all attributes based on their global nature
-      filtered = filtered.filter((attr) => {
-        if (attr.isGlobal) {
-          return filters.linkTypes.global
-        } else {
-          return filters.linkTypes.direct
-        }
-      })
-    }
-
-    // Sorting
-    filtered.sort((a, b) => {
-      let aValue: string | number | Date
-      let bValue: string | number | Date
-
-      switch (sortConfig.field) {
-        case 'category':
-          aValue = getCategoryDisplayName(a)
-          bValue = getCategoryDisplayName(b)
-          break
-        case 'productsInUse':
-          aValue = Number(a.productsInUse)
-          bValue = Number(b.productsInUse)
-          break
-        case 'createdOn':
-        case 'updatedOn':
-          // Handle both ISO date strings and formatted date strings
-          aValue = a[sortConfig.field].includes('T')
-            ? new Date(a[sortConfig.field])
-            : new Date(
-              a[sortConfig.field].replace(
-                /(\d{2})\/(\d{2})\/(\d{2})/,
-                '20$3-$2-$1',
-              ),
-            )
-          bValue = b[sortConfig.field].includes('T')
-            ? new Date(b[sortConfig.field])
-            : new Date(
-              b[sortConfig.field].replace(
-                /(\d{2})\/(\d{2})\/(\d{2})/,
-                '20$3-$2-$1',
-              ),
-            )
-          break
-        default:
-          aValue = String(a[sortConfig.field] || '').toLowerCase()
-          bValue = String(b[sortConfig.field] || '').toLowerCase()
-      }
-
-      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1
-      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1
-      return 0
-    })
-
-    return filtered
-  }, [backendAttributes, filters, sortConfig, flatCategories])
-
-  const totalPages = Math.ceil(
-    filteredAndSortedAttributes.length / itemsPerPage,
-  )
+  const totalPages = Math.ceil(totalCount / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
-  const paginatedAttributes = filteredAndSortedAttributes.slice(
-    startIndex,
-    startIndex + itemsPerPage,
-  )
+  const paginatedAttributes = attributes
+
+  console.log(`totalCount ${totalCount} ${totalPages}`)
 
   const handleFilterChange = (
     key: keyof FilterState,
@@ -341,7 +261,7 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
           </div>
           <p className="text-red-600 font-medium mb-2">Failed to load data</p>
           <p className="text-gray-500 mb-4">
-            {attributesError || categoriesError}
+            {attributesError ?? categoriesError}
           </p>
           <button
             onClick={refetchAttributes}
@@ -361,7 +281,7 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
           <div>
             <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
             <p className="text-gray-600 mt-1">
-              {backendAttributes.length} attribute(s)
+              {attributes.length} attribute(s)
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -387,10 +307,11 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-2 border rounded-md transition-colors ${showFilters || activeFiltersCount > 0
+            className={`flex items-center gap-2 px-4 py-2 border rounded-md transition-colors ${
+              showFilters || activeFiltersCount > 0
                 ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
                 : 'text-gray-700 border-gray-300 hover:bg-gray-50'
-              }`}
+            }`}
           >
             <Filter className="w-4 h-4" />
             {showFilters ? 'Hide Filters' : 'Show Filters'}
@@ -526,10 +447,11 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
                             type as keyof FilterState['linkTypes'],
                           )
                         }
-                        className={`px-3 py-1 rounded text-sm font-medium transition-colors ${isSelected
+                        className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                          isSelected
                             ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
                             : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
-                          }`}
+                        }`}
                       >
                         {type.charAt(0).toUpperCase() + type.slice(1)}
                       </button>
@@ -696,15 +618,12 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
       <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
         <div className="text-sm text-gray-700">
           Showing {startIndex + 1} to{' '}
-          {Math.min(
-            startIndex + itemsPerPage,
-            filteredAndSortedAttributes.length,
-          )}{' '}
-          of {filteredAndSortedAttributes.length} attribute(s)
-          {filteredAndSortedAttributes.length !== backendAttributes.length && (
+          {Math.min(startIndex + itemsPerPage, attributes.length)} of{' '}
+          {totalCount} attribute(s)
+          {attributes.length !== totalCount && (
             <span className="text-gray-500">
               {' '}
-              (filtered from {backendAttributes.length} total)
+              (filtered from {totalCount} total)
             </span>
           )}
         </div>
@@ -736,10 +655,11 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
               <button
                 key={pageNumber}
                 onClick={() => setCurrentPage(pageNumber)}
-                className={`px-3 py-1 rounded transition-colors ${pageNumber === currentPage
+                className={`px-3 py-1 rounded transition-colors ${
+                  pageNumber === currentPage
                     ? 'bg-indigo-600 text-white'
                     : 'text-gray-600 hover:bg-gray-100'
-                  }`}
+                }`}
               >
                 {pageNumber}
               </button>

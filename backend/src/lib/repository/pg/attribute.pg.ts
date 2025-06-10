@@ -5,7 +5,8 @@ import {
   ListAttributesFilter,
 } from '../attribute.repository'
 import { Attribute } from '../../entity/attribute.entity'
-import { PagingatedResult } from '../../../types'
+import { Any, PagingatedResult } from '../../../types'
+import { fetchCount } from './common'
 
 // Whitelist of allowed column names to prevent SQL injection
 const fieldsMap: Record<keyof Omit<Attribute, 'id'>, string> = {
@@ -37,7 +38,7 @@ export class PgAttributeRepository implements AttributeRepository {
 
     const orderBy = mapOrderBy(filter.orderBy)
 
-    const attributesQuery = `
+    let query = `
       SELECT
           a.id,
           a."name",
@@ -54,14 +55,15 @@ export class PgAttributeRepository implements AttributeRepository {
       AND ($2::bigint[] IS NULL OR c.id = ANY($2))
       GROUP BY a.id, a."name", a."type", a.created_on, a.updated_on
       ORDER BY ${orderBy}, a.id
-      OFFSET $3 LIMIT $4
     `
-    const attributesResult = await this.pool.query(attributesQuery, [
-      filter.nameLike ?? null,
-      filter.categories ?? null,
-      offset,
-      limit,
-    ])
+    const params: Any[] = [filter.nameLike ?? null, filter.categories ?? null]
+
+    const totalCount = await fetchCount(this.pool, query, params)
+
+    query += `OFFSET $3 LIMIT $4`
+    params.push(offset, limit)
+
+    const attributesResult = await this.pool.query(query, params)
 
     const result = attributesResult.rows.map((row) => ({
       id: row.id,
@@ -78,7 +80,7 @@ export class PgAttributeRepository implements AttributeRepository {
       pagination: {
         page: filter.page ?? 1,
         pageSize: limit,
-        hasNextPage: result.length === limit,
+        totalCount,
       },
     }
   }

@@ -131,4 +131,3 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
     </div>
   )
 }
-

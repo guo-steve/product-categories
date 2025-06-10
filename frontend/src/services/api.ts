@@ -1,5 +1,5 @@
 import { config } from '../config/env'
-import { Attribute, Category, Attribute } from '../types'
+import { Attribute, Category, PaginatedResult } from '../types'
 
 // Backend response types
 export interface BackendCategory {
@@ -40,19 +40,38 @@ const transformCategory = (backendCategory: BackendCategory): Category => {
   }
 }
 
+export interface AttributeFilter {
+  page?: number
+  pageSize?: number
+  nameLike?: string
+  categories?: string[] // Array of category IDs
+  orderBy?: string // e.g. "name:asc" or "createdOn:desc"
+}
+
 // API functions
-export const fetchAttributes = async (): Promise<Attribute[]> => {
+export const fetchAttributes = async (
+  filter: AttributeFilter,
+): Promise<PaginatedResult<Attribute>> => {
   try {
-    const response = await fetch(`${config.apiBaseUrl}/attributes`)
+    const queryParams = new URLSearchParams(
+      Object.fromEntries(
+        Object.entries(filter ?? {}).filter(
+          ([_, value]) => value !== undefined,
+        ),
+      ),
+    ).toString()
+
+    const response = await fetch(
+      `${config.apiBaseUrl}/attributes?${queryParams}`,
+    )
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
 
-    const attributes: Attribute[] = await response.json()
+    const result: PaginatedResult<Attribute> = await response.json()
 
-    // Transform to frontend format
-    return attributes.map((attr) => ({
+    const attributes: Attribute[] = result.data.map((attr: Attribute) => ({
       id: attr.id,
       name: attr.name,
       type: attr.type as Attribute['type'],
@@ -62,6 +81,11 @@ export const fetchAttributes = async (): Promise<Attribute[]> => {
       updatedOn: formatDate(attr.updatedOn),
       isGlobal: attr.categories.length === 0, // Global if no categories
     }))
+
+    return {
+      data: attributes,
+      pagination: result.pagination,
+    }
   } catch (error) {
     console.error('Error fetching attributes:', error)
     throw error

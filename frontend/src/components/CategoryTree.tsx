@@ -78,10 +78,7 @@ const DropdownMenu: React.FC<DropdownMenuProps> = ({
               item.action()
               onClose()
             }}
-            className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition-colors ${item.danger
-                ? 'text-red-600 hover:bg-red-50'
-                : 'text-gray-700 hover:bg-gray-50'
-              }`}
+            className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition-colors ${'text-gray-700 hover:bg-gray-50'}`}
           >
             <item.icon className="w-4 h-4" />
             {item.label}
