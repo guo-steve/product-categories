@@ -450,6 +450,10 @@ const categories = [
   { id: 447, name: 'Crystals & Stones', parent_id: 445 },
   { id: 448, name: 'Essential Oils', parent_id: 445 },
   { id: 449, name: 'Yoga Accessories', parent_id: 445 },
+  { id: 450, name: 'Noodles', parent_id: 87 },
+  { id: 451, name: 'Pasta', parent_id: 450 },
+  { id: 452, name: 'Rice', parent_id: 450 },
+  { id: 453, name: 'Instant Noodles', parent_id: 450 },
 ]
 
 export async function seed(knex: Knex): Promise<void> {

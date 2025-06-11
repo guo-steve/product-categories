@@ -51,9 +51,9 @@ export const getAttributes = async (event: APIGatewayEvent) => {
     categories: parseResult.data.categories,
     orderBy: orderBy
       ? {
-        field: orderBy[0] as keyof Omit<Attribute, 'id'>,
-        direction: orderBy[1] as 'asc' | 'desc',
-      }
+          field: orderBy[0] as keyof Omit<Attribute, 'id'>,
+          direction: orderBy[1] as 'asc' | 'desc',
+        }
       : orderBy,
   }
 

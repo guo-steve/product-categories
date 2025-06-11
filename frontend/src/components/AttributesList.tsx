@@ -9,6 +9,7 @@ import {
 } from '../types'
 import { useAttributes } from '../hooks/useAttributes'
 import { useCategories } from '../hooks/useCategories'
+import { useDebounce } from '../hooks/useDebounce'
 
 interface AttributesListProps {
   title: string
@@ -48,6 +49,7 @@ const getCategoryDisplayName = (attribute: Attribute): string => {
   return attribute.categories.join(', ')
 }
 
+
 export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
   const [showFilters, setShowFilters] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
@@ -55,8 +57,7 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     field: 'name',
     direction: 'asc',
-  })
-
+  });
   const [filters, setFilters] = useState<FilterState>({
     categories: [],
     linkTypes: {
@@ -67,23 +68,27 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
     showNotApplicable: false,
     keyword: '',
     categorySearch: '',
-  })
+  });
+
+  // Use the debounce hook
+  const debouncedKeyword = useDebounce(filters.keyword, 500);
 
   // Fetch attributes and categories from backend
   const filter = useMemo(
     () => ({
       page: currentPage,
       pageSize: itemsPerPage,
-      nameLike: filters.keyword,
+      nameLike: debouncedKeyword,
       orderBy: `${sortConfig.field}:${sortConfig.direction}`,
       categories: filters.categories,
-      linkTypes: filters.linkTypes,
+      linkTypes: Object.entries(filters.linkTypes)
+        .filter(([, isTrue]) => isTrue).map(([linkType]) => linkType).join('+'),
       showNotApplicable: filters.showNotApplicable,
     }),
     [
       currentPage,
       itemsPerPage,
-      filters.keyword,
+      debouncedKeyword,
       filters.categories,
       filters.linkTypes,
       filters.showNotApplicable,
@@ -97,12 +102,10 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
     pagination,
     loading: attributesLoading,
     error: attributesError,
-    refetch: refetchAttributes,
   } = useAttributes(filter)
 
   const {
     categories: backendCategories,
-    loading: categoriesLoading,
     error: categoriesError,
   } = useCategories()
 
@@ -130,8 +133,6 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
   const totalPages = Math.ceil(totalCount / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const paginatedAttributes = attributes
-
-  console.log(`totalCount ${totalCount} ${totalPages}`)
 
   const handleFilterChange = (
     key: keyof FilterState,
@@ -231,51 +232,23 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
     return hasDirectLink ? 'direct' : 'inherited'
   }
 
-  // Show loading state
-  if (attributesLoading || categoriesLoading) {
-    return (
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
-          <p className="text-gray-600 mt-1">Loading attributes...</p>
-        </div>
-        <div className="px-6 py-12 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="text-gray-500 mt-2">Loading attributes...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Show error state
-  if (attributesError || categoriesError) {
-    return (
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
-          <p className="text-gray-600 mt-1">Error loading data</p>
-        </div>
-        <div className="px-6 py-12 text-center">
-          <div className="text-red-600 mb-4">
-            <X className="w-8 h-8 mx-auto" />
-          </div>
-          <p className="text-red-600 font-medium mb-2">Failed to load data</p>
-          <p className="text-gray-500 mb-4">
-            {attributesError ?? categoriesError}
-          </p>
-          <button
-            onClick={refetchAttributes}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="bg-white rounded-lg border border-gray-200">
+      {(attributesError || categoriesError) && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <X className="h-5 w-5 text-red-500" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700">
+                {attributesError || categoriesError}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div>
@@ -307,11 +280,10 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-2 border rounded-md transition-colors ${
-              showFilters || activeFiltersCount > 0
-                ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
-                : 'text-gray-700 border-gray-300 hover:bg-gray-50'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-md transition-colors ${showFilters || activeFiltersCount > 0
+              ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+              : 'text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
           >
             <Filter className="w-4 h-4" />
             {showFilters ? 'Hide Filters' : 'Show Filters'}
@@ -447,11 +419,10 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
                             type as keyof FilterState['linkTypes'],
                           )
                         }
-                        className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                          isSelected
-                            ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
-                            : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
-                        }`}
+                        className={`px-3 py-1 rounded text-sm font-medium transition-colors ${isSelected
+                          ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
+                          : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
+                          }`}
                       >
                         {type.charAt(0).toUpperCase() + type.slice(1)}
                       </button>
@@ -513,9 +484,9 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
                 </th>
                 <th
                   className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('category')}
+                  onClick={() => handleSort('categories')}
                 >
-                  Product Category {getSortIcon('category')}
+                  Product Category {getSortIcon('categories')}
                 </th>
                 <th
                   className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -547,69 +518,84 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {paginatedAttributes.map((attribute) => {
-                const linkType = getAttributeLinkType(
-                  attribute,
-                  filters.categories,
-                )
-                const categoryDisplay = getCategoryDisplayName(attribute)
+              {attributesLoading && attributes.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+                    <p className="text-gray-500 mt-2">Loading attributes...</p>
+                  </td>
+                </tr>
+              ) : attributes.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
+                    No attributes found
+                  </td>
+                </tr>
+              ) : (
+                paginatedAttributes.map((attribute) => {
+                  const linkType = getAttributeLinkType(
+                    attribute,
+                    filters.categories,
+                  )
+                  const categoryDisplay = getCategoryDisplayName(attribute)
 
-                return (
-                  <tr
-                    key={attribute.id}
-                    className="hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        className="rounded border-gray-300"
-                      />
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
+                  return (
+                    <tr
+                      key={attribute.id}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300"
+                        />
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <span className="text-indigo-600 font-medium">
+                            {attribute.name}
+                          </span>
+                          {linkType === 'inherited' && (
+                            <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
+                              Inherited
+                            </span>
+                          )}
+                          {linkType === 'global' && (
+                            <span className="px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded">
+                              Global
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-gray-700">
+                        {categoryDisplay}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <span className="text-indigo-600 font-medium">
-                          {attribute.name}
+                          {attribute.productsInUse}
                         </span>
-                        {linkType === 'inherited' && (
-                          <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
-                            Inherited
-                          </span>
-                        )}
-                        {linkType === 'global' && (
-                          <span className="px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded">
-                            Global
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-700">
-                      {categoryDisplay}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-indigo-600 font-medium">
-                        {attribute.productsInUse}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-700">
-                      {attribute.type}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-600">
-                      {attribute.createdOn}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-600">
-                      {attribute.updatedOn}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <button className="text-indigo-600 hover:text-indigo-800 font-medium">
-                          More
-                        </button>
-                        <ChevronDown className="w-4 h-4 text-gray-400" />
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-gray-700">
+                        {attribute.type}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-gray-600">
+                        {attribute.createdOn}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-gray-600">
+                        {attribute.updatedOn}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <button className="text-indigo-600 hover:text-indigo-800 font-medium">
+                            More
+                          </button>
+                          <ChevronDown className="w-4 h-4 text-gray-400" />
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -655,11 +641,10 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
               <button
                 key={pageNumber}
                 onClick={() => setCurrentPage(pageNumber)}
-                className={`px-3 py-1 rounded transition-colors ${
-                  pageNumber === currentPage
-                    ? 'bg-indigo-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
+                className={`px-3 py-1 rounded transition-colors ${pageNumber === currentPage
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+                  }`}
               >
                 {pageNumber}
               </button>

@@ -54,16 +54,20 @@ export class PgAttributeRepository implements AttributeRepository {
       WHERE ($1::text IS NULL OR a."name" ILIKE '%' || $1 || '%')
       AND ($2::bigint[] IS NULL OR c.id = ANY($2))
       GROUP BY a.id, a."name", a."type", a.created_on, a.updated_on
-      ORDER BY ${orderBy}, a.id
+      ORDER BY ${orderBy} NULLS LAST, a.id
     `
-    const params: Any[] = [filter.nameLike ?? null, filter.categories ?? null]
+    const params: Any[] = [filter.nameLike || null, filter.categories ?? null]
 
     const totalCount = await fetchCount(this.pool, query, params)
 
     query += `OFFSET $3 LIMIT $4`
     params.push(offset, limit)
 
+    console.log('Executing query: %s\n  params: %o', query, params)
+
     const attributesResult = await this.pool.query(query, params)
+
+    console.log('result: %o', attributesResult.rows)
 
     const result = attributesResult.rows.map((row) => ({
       id: row.id,

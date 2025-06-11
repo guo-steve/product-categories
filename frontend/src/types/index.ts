@@ -106,7 +106,7 @@ export interface SortConfig {
   field:
     | 'name'
     | 'type'
-    | 'category'
+    | 'categories'
     | 'productsInUse'
     | 'createdOn'
     | 'updatedOn'
