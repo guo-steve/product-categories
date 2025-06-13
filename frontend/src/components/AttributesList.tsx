@@ -49,7 +49,6 @@ const getCategoryDisplayName = (attribute: Attribute): string => {
   return attribute.categories.join(', ')
 }
 
-
 export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
   const [showFilters, setShowFilters] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
@@ -57,7 +56,7 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     field: 'name',
     direction: 'asc',
-  });
+  })
   const [filters, setFilters] = useState<FilterState>({
     categories: [],
     linkTypes: {
@@ -68,10 +67,10 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
     showNotApplicable: false,
     keyword: '',
     categorySearch: '',
-  });
+  })
 
   // Use the debounce hook
-  const debouncedKeyword = useDebounce(filters.keyword, 500);
+  const debouncedKeyword = useDebounce(filters.keyword, 500)
 
   // Fetch attributes and categories from backend
   const filter = useMemo(
@@ -82,7 +81,9 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
       orderBy: `${sortConfig.field}:${sortConfig.direction}`,
       categories: filters.categories,
       linkTypes: Object.entries(filters.linkTypes)
-        .filter(([, isTrue]) => isTrue).map(([linkType]) => linkType).join('+'),
+        .filter(([, isTrue]) => isTrue)
+        .map(([linkType]) => linkType)
+        .join('+'),
       showNotApplicable: filters.showNotApplicable,
     }),
     [
@@ -104,10 +105,8 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
     error: attributesError,
   } = useAttributes(filter)
 
-  const {
-    categories: backendCategories,
-    error: categoriesError,
-  } = useCategories()
+  const { categories: backendCategories, error: categoriesError } =
+    useCategories()
 
   const flatCategories = useMemo(
     () => flattenCategories(backendCategories),
@@ -272,7 +271,7 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search attributes by name, type, or category"
+              placeholder="Search attributes by name"
               value={filters.keyword}
               onChange={(e) => handleFilterChange('keyword', e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -280,10 +279,11 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-2 border rounded-md transition-colors ${showFilters || activeFiltersCount > 0
-              ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
-              : 'text-gray-700 border-gray-300 hover:bg-gray-50'
-              }`}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-md transition-colors ${
+              showFilters || activeFiltersCount > 0
+                ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                : 'text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
           >
             <Filter className="w-4 h-4" />
             {showFilters ? 'Hide Filters' : 'Show Filters'}
@@ -419,10 +419,11 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
                             type as keyof FilterState['linkTypes'],
                           )
                         }
-                        className={`px-3 py-1 rounded text-sm font-medium transition-colors ${isSelected
-                          ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
-                          : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
-                          }`}
+                        className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                          isSelected
+                            ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
+                            : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
+                        }`}
                       >
                         {type.charAt(0).toUpperCase() + type.slice(1)}
                       </button>
@@ -527,7 +528,10 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
                 </tr>
               ) : attributes.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
+                  <td
+                    colSpan={8}
+                    className="px-4 py-12 text-center text-gray-500"
+                  >
                     No attributes found
                   </td>
                 </tr>
@@ -641,10 +645,11 @@ export const AttributesList: React.FC<AttributesListProps> = ({ title }) => {
               <button
                 key={pageNumber}
                 onClick={() => setCurrentPage(pageNumber)}
-                className={`px-3 py-1 rounded transition-colors ${pageNumber === currentPage
-                  ? 'bg-indigo-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
-                  }`}
+                className={`px-3 py-1 rounded transition-colors ${
+                  pageNumber === currentPage
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
               >
                 {pageNumber}
               </button>

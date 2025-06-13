@@ -11,5 +11,6 @@ export default defineConfig({
       'test/**/*.e2e.test.ts', // explicitly include E2E files
     ],
     setupFiles: ['test/setup.ts', 'test/setup.e2e.ts'], // optional, for AWS profile or global mocks
+    testTimeout: 5000, // Timeout in milliseconds (e.g., 5000ms = 5 seconds)
   },
 })

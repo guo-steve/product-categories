@@ -1,6 +1,8 @@
 import type { Knex } from 'knex'
 
 export async function up(knex: Knex): Promise<void> {
+  console.log('Creating tables for product catalog...')
+
   await knex.raw(
     `
 -- Create category table with self-referencing hierarchy
