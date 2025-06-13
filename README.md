@@ -7,14 +7,31 @@
 pnpm install
 ```
 
+## Build
+
+```
+pnpm run build
+```
 
 ## Run the project
 
 ```
-pnpm --filter backend run dev
+pnpm --filter backend dev
 ```
 
 
 ```
-pnpm --filter frontend run dev
+pnpm --filter frontend dev
+```
+
+## Deploy
+
+```
+pnpm run deploy --profile <aws profile>
+```
+
+If it is the first time you deploy, you need to run following command to bootstrap the project.
+
+```
+pnpm run bootstrap --profile <aws profile>
 ```
